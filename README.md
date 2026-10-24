@@ -56,5 +56,5 @@ src-tauri/
 菜单栏 logo、可自定义全局快捷键（默认 ⇧⌘D）、关闭隐藏、窗口居中/置顶/尺寸记忆、
 笔记库打开/新建/迁移/备份。
 
-未完成：FTS 搜索（当前为 LIKE 子串）、Shiki 高亮、回收站视图、开机启动开关、签名分发、
+未完成：启动静默、退出确认、FTS 搜索（当前为 LIKE 子串）、Shiki 高亮、回收站视图、开机启动开关、签名分发、
 macOS 实机交互验收。剩余工作见 `openspec/changes/v1-notes-manager/tasks.md` 未勾选项。
