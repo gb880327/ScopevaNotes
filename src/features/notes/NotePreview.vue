@@ -20,8 +20,9 @@ async function onClick(event: MouseEvent) {
   const anchor = (event.target as HTMLElement | null)?.closest('a')
   if (!anchor) return
   const href = anchor.getAttribute('href') ?? ''
-  if (!/^https?:/i.test(href)) return
+  // Never let the webview navigate away from the app; only http(s) opens.
   event.preventDefault()
+  if (!/^https?:/i.test(href)) return
   if (isDesktop) {
     await openUrl(href)
   } else {

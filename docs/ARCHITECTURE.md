@@ -46,3 +46,16 @@ ANY --tray Quit--> exit(0)
 `composables/useAutosave.ts` 提供串行化 + 防抖队列；`stores/notes.ts` 持有队列。
 保存前比较 `expectedUpdatedAt`（乐观并发），落库后若期间又有输入，只更新
 `updatedAt` 而不覆盖本地草稿。切换笔记、隐藏窗口、开关笔记库前都必须 `flush()`。
+
+## 预览渲染
+
+`fences.ts` 先按 CommonMark 围栏规则把正文切成「散文 / 代码」段，散文交给
+`html: false` 的 markdown-it（`markdown.ts`，含协议白名单），代码段交给
+`CodeBlock.vue`（独立复制按钮）。
+
+- 高亮在 `highlight.ts`：`shiki/core` + JS 正则引擎，语言按需 `import()`，
+  失败/未知语言/超 2 万字符回 `null` → 纯文本；配色随 `settings.resolvedTheme`
+  在 `github-light-high-contrast` 与 `github-dark` 间切换。
+- 链接：`markdown.validateLink` 只放行 `http`/`https`/`mailto`/相对路径，
+  预览内点击统一 `preventDefault()`，只有 http(s) 交给系统 opener。
+- 相关决策见 `openspec/changes/v1-notes-manager/design.md` D16。

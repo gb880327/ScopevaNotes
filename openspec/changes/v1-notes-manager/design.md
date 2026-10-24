@@ -68,3 +68,12 @@
 3. **精筛**：候选集仍要过一遍字面 `LIKE`（标题/正文/标签名），因为前缀查询会让 `100%` 的候选里混进 `1000`，词缀匹配也不等于字面包含。标签一律走 `note_tags`/`tags` 联表，**绝不**用 `notes_fts.note_id`（UNINDEXED）做相关子查询——那会把每次查询变成 O(n²)，实测 10k 条时 54 s。
 
 权衡：中文与英文都是「字首/连续字符」匹配，不是任意 infix（搜 `lite` 不命中 `sqlite`）。字面精筛保证了不含假阳性，规格里把粒度写成契约（`sql`→`sqlite`、`管理`→`笔记管理的要点`），避免用 bm25 重排牺牲游标分页的稳定性。基准结果：P50 16.5 ms / P95 18.5 ms（10k 条，14.6 MB）。
+
+**D16 预览 = 自建围栏切分 + 逐段 markdown-it + Shiki 按需高亮。** 每个围栏块要有自己的复制按钮，而 markdown-it 的 `highlight` 钩子只能返回 HTML 字符串，无法挂 Vue 组件；因此先用 `fences.ts` 按 CommonMark 围栏规则把正文切成「散文 / 代码」段，散文交给 `html: false` 的 markdown-it，代码段交给 `CodeBlock.vue`。
+
+1. **围栏解析**：行扫描而非单个正则——闭合围栏必须同字符且不短于开围栏，反引号围栏的信息串不得含反引号，未闭合围栏延续到文末并按代码块渲染（规格要求「未闭合围栏仍可读且可复制」）。
+2. **高亮**：`shiki/core` + JS 正则引擎（不加载 oniguruma wasm），42 种语言各自 `import()` 成独立 chunk，只在笔记里真的出现该语言时才下载；未知语言、空代码、超过 2 万字符、语法加载失败一律回 `null`，组件退回纯文本，绝不让整篇预览失败。
+3. **配色**：Token 颜色直接用 Shiki 的 `github-light-high-contrast` / `github-dark`。原 `github-light` 的橙色字在 `--code-bg` 上只有 3.2:1，实测不达 AA；换高对比版后两种主题的所有 token 实测 ≥ 5.67:1。主题色从 settings store 的 `resolvedTheme` 取，切换深浅色时重新着色而不是重载笔记。
+4. **链接安全**：`markdown.validateLink` 改为协议白名单（`http`/`https`/`mailto`/相对路径），先剥离控制字符再判 scheme，因此 `java\tscript:` 这类变体同样被拒；协议相对 `//host` 一律拒绝。预览的点击处理器统一 `preventDefault()`，只有 http(s) 交给系统 opener，避免 webview 被导航走。
+
+权衡：切分让「代码块」不再是 markdown-it 的产物，两套解析规则必须保持对 CommonMark 围栏的一致（用 12 个单元测试锁定）；语法包按语言拆分意味着首次出现某语言时有几十到几百毫秒的加载与着色延迟，可接受，因为纯文本先行渲染。

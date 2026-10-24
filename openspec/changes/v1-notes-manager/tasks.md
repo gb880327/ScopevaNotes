@@ -25,12 +25,12 @@
 
 - [x] 3.1 CodeMirror 6 + `markdown()`，字号/主题跟随外观设置。
 - [x] 3.2 markdown-it 预览，`html: false`；外链经 opener 打开。
-- [x] 3.3 围栏切分与逐块渲染，5 个单元测试覆盖语言识别/无围栏/未闭合/`~~~`。
+- [x] 3.3 围栏切分与逐块渲染，12 个单元测试覆盖语言识别/无围栏/未闭合/`~~~`/长围栏/信息串。
 - [x] 3.4 代码块复制只写代码原文；标题区复制全文为原始 Markdown。
 - [x] 3.5 `Command+E` 切换读/写、`Esc` 退出并 flush。
-- [ ] 3.6 接入 Shiki 高亮：常用语言着色、未知语言降级纯文本、失败不影响整篇预览。
-- [ ] 3.7 建立预览安全用例：`<script>`、`<img onerror>`、`javascript:` 链接、超长/未闭合围栏。
-- [ ] 3.8 组件测试：读/写切换、复制按钮文案与状态、空笔记渲染。
+- [x] 3.6 接入 Shiki 高亮：`highlight.ts` 用 `createHighlighterCore` + JS 正则引擎，42 种语言与常见别名（`ts`/`sh`/`yml`/`c++`…）按需动态 import，每种语言独立 chunk；未知语言/空代码/超 2 万字符/语法加载失败一律回 `null` 降级纯文本，不抛异常。浅色用 `github-light-high-contrast`（实测原 `github-light` 橙色字在代码背景上仅 3.2:1），深色用 `github-dark`，两种主题全部 token 实测对比度 ≥ 5.67:1；`resolvedTheme` 提到 settings store，代码块随主题重新着色。
+- [x] 3.7 预览安全用例：`markdown.ts` 改为协议白名单（`http`/`https`/`mailto`/相对路径），`validateLink` 先剥离控制字符再判 scheme，拒绝 `//host`；预览点击统一 `preventDefault`，只有 http(s) 交给 opener。`fences.ts` 改行扫描，按 CommonMark 规则处理长于开围栏的闭合、信息串内反引号、未闭合围栏到文末（可复制）、5 万字符行。`markdown.test.ts` + `fences.test.ts` 共 30 个用例覆盖 `<script>`、`<img onerror>`、`javascript:`/大小写混写/控制字符/`data:`/`file:`/`//host`、未闭合与超长围栏。
+- [x] 3.8 组件测试：`NoteHeader.test.ts` 读/写切换（含退出前 flush）、复制全文文案、收藏按钮、标签渲染；`CodeBlock.test.ts` 复制原文、`复制代码→已复制→复制代码`、失败文案、未知语言/空语言纯文本；`NotePreview.test.ts` 空笔记、围栏独立复制、未闭合围栏可复制、脚本不执行、危险链接无锚点、https 链接走系统浏览器。前端测试共 74 个用例全绿（原 12 个）。
 
 ## 4. 搜索（search）
 

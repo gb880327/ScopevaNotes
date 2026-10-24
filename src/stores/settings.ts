@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { load, type Store } from '@tauri-apps/plugin-store'
 import { api, errorMessage, isDesktop } from '@/services/commands'
 
@@ -39,6 +39,12 @@ export const useSettingsStore = defineStore('settings', () => {
   const shortcut = ref(DEFAULTS.shortcut)
   const shortcutError = ref<string | null>(null)
   const ready = ref(false)
+  /** Tracks `prefers-color-scheme`, so `system` can resolve without a DOM read. */
+  const systemDark = ref(false)
+
+  const resolvedTheme = computed<'light' | 'dark'>(() =>
+    theme.value === 'system' ? (systemDark.value ? 'dark' : 'light') : theme.value,
+  )
 
   let store: Store | null = null
 
@@ -139,6 +145,8 @@ export const useSettingsStore = defineStore('settings', () => {
     shortcut,
     shortcutError,
     ready,
+    systemDark,
+    resolvedTheme,
     hydrate,
     applyShortcut,
     changeShortcut,
