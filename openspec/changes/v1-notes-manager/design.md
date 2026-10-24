@@ -94,3 +94,12 @@
 已修的真问题：`--text-faint` 白底 3.26:1（侧栏 2.99）→ `#68686e` / `#a3a3a9`；`--text-muted` 在选中底 4.12:1 → `#5f5f66`，并把 `--selected` 由 7% 降到 5% 黑；深色 `--danger #ff453a` 在抬升底 3.87:1 → `#ff7a72`。
 
 未纳入自动断言、明确接受的限制：①`--accent` 作为非文字填充对底色的对比（绿 `#30d158` 白底 2.0:1、橙 `#ff9f0a` 2.06:1）；理由是所有强调色圆点旁边都有文字标签、选中态还有底色与字重变化，颜色不是唯一信息通道。若要严格满足 WCAG 1.4.11 的 3:1，需要再给非文字填充加一档更深的变体，代价是品牌色观感变暗。②`--border` / `--border-strong` 只有 1.2–1.5:1，属于与 Apple 原生一致的低对比分隔线，不作为「识别控件所必需」的视觉信息。③标签圆点用的是用户自选颜色（存库），无法在令牌层约束。
+
+**D19 笔记库提示（notice）是一条数据，不是若干处 if。** 库相关的「不是错误但用户必须知道」的状态（回退到默认库、库在云同步目录）统一挂在 `LibraryInfo.notice` 上，随 `get_library_info` / `open_library` / `create_library` / `move_library` 一起返回，而不是让前端自己推断。
+
+1. **回退是数据丢失风险，必须可见**：`resolve_from(configured, default_path)` 在配置库不可用时打开默认库并附 `fallback` 提示（消息含原因与被放弃的路径），因此启动不会失败，而「当前显示的是默认库」这件事不会只留在 `eprintln!` 里。`resolve()` 只负责读配置并把默认路径传进去，这让回退分支可以脱离 `AppHandle` 做单元测试。
+2. **提示只提供它能兑现的动作**：`dismiss_library_notice(use_default)` 仅在提示是 `fallback` 时改写 `config.json`；云同步提示忽略 `use_default`，否则「知道了」会悄悄把用户的路径改成默认库——那正是 5.6 要避免的静默行为。
+3. **云同步按路径组件识别**：只匹配整段目录名（`Dropbox`、`Mobile Documents`…），且只有 `OneDrive`/`Google Drive` 这类实际会带账户后缀的 provider 允许 `name-…`/`name …`，避免把 `dropbox-notes.db` 当成同步目录。提示是建议性的：不阻止使用，也不在每次保存时重复弹窗。
+4. **锁冲突是错误类型，不是文案**：rusqlite 的 `database is locked` 原本会被当作泛化的 `Database` 错误。`AppError::classify()` 把含 `locked`/`busy` 的错误提升为 `Busy`（`kind = "busy"`），`busy_timeout` 参数化（生产 5 s、测试 150 ms），前端 `errorMessage()` 按 kind 给文案。这样「等一会儿再试」与「文件坏了」在 UI 上不再同罪。
+
+权衡：回退策略牺牲了「配置失效就报错」的严格性，换取启动永远可用；补偿是提示不可关闭地出现在设置页（直到用户选择动作），且规格把「可见说明」写成 MUST。云同步检测是启发式的，误报的代价只是一条建议横幅。

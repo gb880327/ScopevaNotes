@@ -18,13 +18,19 @@ pub struct Database {
 
 impl Database {
     pub fn open(path: impl AsRef<Path>) -> AppResult<Self> {
+        Self::open_with_busy_timeout(path, Duration::from_secs(5))
+    }
+
+    /// Tests need a short timeout; the app keeps a 5 s window so a cloud sync
+    /// client releasing its lock does not surface as an error.
+    pub fn open_with_busy_timeout(path: impl AsRef<Path>, busy: Duration) -> AppResult<Self> {
         let path = path.as_ref().to_path_buf();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
         let conn = Connection::open(&path)?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
-        conn.busy_timeout(Duration::from_secs(5))?;
+        conn.busy_timeout(busy)?;
 
         let db = Self {
             path,
@@ -46,7 +52,7 @@ impl Database {
             .conn
             .lock()
             .map_err(|_| AppError::Other("database lock poisoned".into()))?;
-        f(&mut guard)
+        f(&mut guard).map_err(AppError::classify)
     }
 
     pub fn quick_check(&self) -> AppResult<String> {

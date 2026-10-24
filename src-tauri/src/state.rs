@@ -42,6 +42,14 @@ impl AppState {
         *self.library.lock().expect("state lock poisoned") = info;
     }
 
+    /// Hide the current library notice (the user read it or switched to the
+    /// default library). Returns the refreshed snapshot.
+    pub fn clear_notice(&self) -> LibraryInfo {
+        let mut info = self.library.lock().expect("state lock poisoned");
+        info.notice = None;
+        info.clone()
+    }
+
     /// The accelerator currently registered with the global shortcut plugin.
     pub fn shortcut(&self) -> String {
         self.shortcut.lock().expect("state lock poisoned").clone()

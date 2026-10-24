@@ -6,6 +6,7 @@ export type AppErrorKind =
   | 'not_found'
   | 'conflict'
   | 'invalid'
+  | 'busy'
   | 'other'
 
 /** Shape produced by `models/error.rs` and by the `commands.ts` normaliser. */
@@ -49,12 +50,22 @@ export interface NoteDetail {
   tags: Tag[]
 }
 
+export type LibraryNoticeKind = 'fallback' | 'cloud-sync'
+
+/** Mirrors `library_service::LibraryNotice`. */
+export interface LibraryNotice {
+  kind: LibraryNoticeKind
+  message: string
+  path: string | null
+}
+
 export interface LibraryInfo {
   path: string
   schemaVersion: number
   isDefault: boolean
   noteCount: number
   fileSizeBytes: number
+  notice: LibraryNotice | null
 }
 
 export interface ListNotesArgs {

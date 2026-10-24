@@ -43,10 +43,11 @@ pub fn run() {
 
             let (db, info) = match library_service::resolve(&handle) {
                 Ok(pair) => pair,
+                // `resolve` itself falls back with a UI notice for a bad
+                // configured path. Reaching this means even the default library
+                // is unusable (no home directory, unwritable app data dir), so
+                // this fallback only stops an early crash.
                 Err(err) => {
-                    // Never leave the user without a window: fall back to the
-                    // default library and surface the failure once the library
-                    // UI exists (M1/M5).
                     eprintln!("[library] falling back to default library: {err}");
                     let path = library_service::default_library_path(&handle)?;
                     let db = database::Database::open(&path)?;
@@ -101,6 +102,7 @@ pub fn run() {
             commands::libraries::open_library,
             commands::libraries::move_library,
             commands::libraries::backup_library,
+            commands::libraries::dismiss_library_notice,
             commands::window::toggle_main_window,
             commands::shortcuts::get_global_shortcut,
             commands::shortcuts::set_global_shortcut,

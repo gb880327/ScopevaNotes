@@ -5,7 +5,7 @@ use tauri::{AppHandle, State};
 use crate::commands::blocking;
 use crate::database::{backup, Database};
 use crate::models::AppResult;
-use crate::services::library_service::{self, AppConfig, LibraryInfo};
+use crate::services::library_service::{self, AppConfig, LibraryInfo, NoticeKind};
 use crate::state::AppState;
 
 #[tauri::command]
@@ -86,4 +86,28 @@ pub async fn backup_library(state: State<'_, AppState>, destination: String) -> 
     let db = state.db();
     let target = PathBuf::from(destination);
     blocking(move || db.with_conn(|conn| backup::backup_to(conn, &target))).await
+}
+
+/// Acknowledge the library notice. `use_default` also rewrites `config.json` to
+/// the default location, which is what the fallback banner offers; it is ignored
+/// for advisory notices (cloud sync) so the user's path is never discarded.
+#[tauri::command]
+pub async fn dismiss_library_notice(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    use_default: bool,
+) -> AppResult<LibraryInfo> {
+    let is_fallback = matches!(
+        state.library().notice.map(|notice| notice.kind),
+        Some(NoticeKind::Fallback)
+    );
+    if use_default && is_fallback {
+        library_service::save_config(
+            &app,
+            &AppConfig {
+                library_path: None,
+            },
+        )?;
+    }
+    Ok(state.clear_notice())
 }

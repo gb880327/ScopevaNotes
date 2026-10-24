@@ -77,6 +77,9 @@ export const api = {
   moveLibrary: (path: string) => call<LibraryInfo>('move_library', { path }),
   backupLibrary: (destination: string) =>
     call<number>('backup_library', { destination }),
+  /** `useDefault` also points config.json back at the default library. */
+  dismissLibraryNotice: (useDefault = false) =>
+    call<LibraryInfo>('dismiss_library_notice', { useDefault }),
 
   toggleMainWindow: () => call<boolean>('toggle_main_window'),
 
@@ -89,7 +92,16 @@ export const api = {
 }
 
 export function errorMessage(err: unknown): string {
-  if (err instanceof CommandError) return err.message
+  if (err instanceof CommandError) return friendlyText(err)
   if (err instanceof Error) return err.message
   return String(err)
+}
+
+/** Raw SQLite strings are diagnostic, not user-facing (spec: library / 锁冲突). */
+const FRIENDLY_ERRORS: Partial<Record<AppErrorKind, string>> = {
+  busy: '笔记库正被其他程序占用（云同步可能正在写入），请稍后重试。',
+}
+
+function friendlyText(err: CommandError): string {
+  return FRIENDLY_ERRORS[err.kind] ?? err.message
 }

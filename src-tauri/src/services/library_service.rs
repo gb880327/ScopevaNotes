@@ -6,6 +6,26 @@ use tauri::{AppHandle, Manager, Runtime};
 use crate::database::{migrations, Database};
 use crate::models::{AppError, AppResult};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum NoticeKind {
+    /// The configured library was unusable, so the default one was opened.
+    Fallback,
+    /// The library lives inside a cloud-sync folder.
+    CloudSync,
+}
+
+/// Something the user must see about the active library. Rendered as a banner
+/// in the settings panel (spec: library / 路径失效与云同步提示).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryNotice {
+    pub kind: NoticeKind,
+    pub message: String,
+    /// Path the notice is about (the configured one for a fallback).
+    pub path: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryInfo {
@@ -16,6 +36,8 @@ pub struct LibraryInfo {
     pub note_count: i64,
     /// Main database file plus its WAL, so the number matches Finder after writes.
     pub file_size_bytes: i64,
+    #[serde(default)]
+    pub notice: Option<LibraryNotice>,
 }
 
 /// Only the library pointer and UI preferences live here — never note data
@@ -54,27 +76,89 @@ pub fn default_library_path<R: Runtime>(app: &AppHandle<R>) -> AppResult<PathBuf
 }
 
 /// Resolve the active library, creating the default one on first run.
+///
+/// A configured library that cannot be used never blocks startup and never
+/// silently turns into an empty library: we open the default one and attach a
+/// `Fallback` notice so the UI can offer "choose another" / "use default"
+/// (plan §1.8, D12).
 pub fn resolve<R: Runtime>(app: &AppHandle<R>) -> AppResult<(Database, LibraryInfo)> {
     let config = load_config(app)?;
-    let default_path = default_library_path(app)?;
+    resolve_from(config.library_path, &default_library_path(app)?)
+}
 
-    if let Some(custom) = config.library_path {
-        let path = PathBuf::from(custom);
-        if path.exists() {
-            let db = Database::open(&path)?;
-            let info = info_for(&db, false)?;
-            return Ok((db, info));
+/// Path-only half of [`resolve`], so the fallback rules are testable without a
+/// Tauri `AppHandle`.
+pub fn resolve_from(
+    configured: Option<String>,
+    default_path: &Path,
+) -> AppResult<(Database, LibraryInfo)> {
+    let Some(custom) = configured else {
+        let db = Database::open(default_path)?;
+        let info = info_for(&db, true)?;
+        return Ok((db, info));
+    };
+
+    let path = PathBuf::from(&custom);
+    let failure = if path.exists() {
+        match Database::open(&path) {
+            Ok(db) => {
+                let info = info_for(&db, false)?;
+                return Ok((db, info));
+            }
+            Err(err) => err.to_string(),
         }
-        // Never silently fall back to an empty library (plan §1.8).
-        return Err(AppError::NotFound(format!(
-            "library not found: {}",
-            path.display()
-        )));
-    }
+    } else {
+        format!("笔记库不存在：{}", path.display())
+    };
 
-    let db = Database::open(&default_path)?;
-    let info = info_for(&db, true)?;
+    let db = Database::open(default_path)?;
+    let mut info = info_for(&db, true)?;
+    info.notice = Some(LibraryNotice {
+        kind: NoticeKind::Fallback,
+        message: format!("配置的笔记库无法打开，已临时改用默认库。原因：{failure}"),
+        path: Some(custom),
+    });
     Ok((db, info))
+}
+
+/// Cloud-sync clients rewrite the database file behind our back; SQLite is fine
+/// with that only while no process holds a lock. Detect the common folders so
+/// the settings panel can warn (spec: 云同步目录提示).
+pub fn cloud_sync_provider(path: &Path) -> Option<&'static str> {
+    // (folder name, provider label, also match `name-…` / `name …`).
+    const PROVIDERS: &[(&str, &str, bool)] = &[
+        ("Dropbox", "Dropbox", false),
+        ("OneDrive", "OneDrive", true),
+        ("Google Drive", "Google Drive", true),
+        ("GoogleDrive", "Google Drive", true),
+        ("iCloud Drive", "iCloud Drive", false),
+        ("Mobile Documents", "iCloud Drive", false),
+        ("Nextcloud", "Nextcloud", false),
+        ("ownCloud", "ownCloud", false),
+        ("pCloud", "pCloud", false),
+        ("Sync.com", "Sync.com", false),
+        ("Box", "Box", false),
+    ];
+    path.components().find_map(|component| {
+        let std::path::Component::Normal(part) = component else {
+            return None;
+        };
+        let part = part.to_string_lossy();
+        PROVIDERS
+            .iter()
+            .find(|(needle, _, allow_prefix)| {
+                // Clients rename the folder per account: `GoogleDrive-me@x`,
+                // `OneDrive - Acme`. Only those providers opt into the prefix
+                // form, so `dropbox-notes.db` is not mistaken for Dropbox.
+                part.eq_ignore_ascii_case(needle)
+                    || *allow_prefix
+                        && part
+                            .get(..needle.len())
+                            .is_some_and(|head| head.eq_ignore_ascii_case(needle))
+                        && part[needle.len()..].starts_with(['-', ' '])
+            })
+            .map(|(_, label, _)| *label)
+    })
 }
 
 pub fn info_for(db: &Database, is_default: bool) -> AppResult<LibraryInfo> {
@@ -87,12 +171,21 @@ pub fn info_for(db: &Database, is_default: bool) -> AppResult<LibraryInfo> {
         )
         .map_err(Into::into)
     })?;
+    let path = db.path().to_string_lossy().into_owned();
+    let notice = cloud_sync_provider(db.path()).map(|provider| LibraryNotice {
+        kind: NoticeKind::CloudSync,
+        message: format!(
+            "笔记库位于 {provider} 同步目录。云同步在写入时可能锁住文件，编辑保存或切换笔记库前请确认同步已完成。"
+        ),
+        path: Some(path.clone()),
+    });
     Ok(LibraryInfo {
-        path: db.path().to_string_lossy().into_owned(),
+        path,
         schema_version,
         is_default,
         note_count,
         file_size_bytes: disk_usage(db.path()),
+        notice,
     })
 }
 

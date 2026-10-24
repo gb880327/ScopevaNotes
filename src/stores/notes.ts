@@ -37,9 +37,14 @@ export const useNotesStore = defineStore('notes', () => {
   // buffer when it still matches (plan §5 optimistic concurrency).
   let editVersion = 0
 
+  // Bumped on every list request; only the newest response may replace `items`.
+  // Without this a slow query for "sq" could land after the query for "sql".
+  let listSeq = 0
+
   const queue = createAutosaveQueue(saveNow, 600)
 
   async function refresh() {
+    const seq = ++listSeq
     loading.value = true
     error.value = null
     try {
@@ -48,17 +53,20 @@ export const useNotesStore = defineStore('notes', () => {
         tagIds: activeTagIds.value.length ? activeTagIds.value : undefined,
         favorite: favoritesOnly.value || undefined,
       })
+      if (seq !== listSeq) return
       items.value = page.items
       nextCursor.value = page.nextCursor
     } catch (err) {
+      if (seq !== listSeq) return
       error.value = errorMessage(err)
     } finally {
-      loading.value = false
+      if (seq === listSeq) loading.value = false
     }
   }
 
   async function loadMore() {
     if (!nextCursor.value) return
+    const seq = listSeq
     try {
       const page = await api.listNotes({
         query: query.value || undefined,
@@ -66,9 +74,12 @@ export const useNotesStore = defineStore('notes', () => {
         favorite: favoritesOnly.value || undefined,
         cursor: nextCursor.value,
       })
+      // A newer query started while this page was in flight: drop it.
+      if (seq !== listSeq) return
       items.value = [...items.value, ...page.items]
       nextCursor.value = page.nextCursor
     } catch (err) {
+      if (seq !== listSeq) return
       error.value = errorMessage(err)
     }
   }

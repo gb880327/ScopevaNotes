@@ -47,6 +47,17 @@ async function backup() {
   await run(async () => void (await api.backupLibrary(path)), '备份完成')
 }
 
+async function dismissNotice(useDefault: boolean) {
+  busy.value = true
+  try {
+    info.value = await api.dismissLibraryNotice(useDefault)
+  } catch (err) {
+    message.value = errorMessage(err)
+  } finally {
+    busy.value = false
+  }
+}
+
 async function run(action: () => Promise<unknown>, success: string) {
   busy.value = true
   message.value = null
@@ -70,6 +81,30 @@ onMounted(refresh)
 <template>
   <section class="library">
     <h3>笔记库</h3>
+
+    <div
+      v-if="info?.notice"
+      class="notice"
+      :class="info.notice.kind"
+      role="status"
+      aria-live="polite"
+    >
+      <p class="notice-text">{{ info.notice.message }}</p>
+      <code v-if="info.notice.path" class="notice-path">{{ info.notice.path }}</code>
+      <div class="notice-actions">
+        <button
+          v-if="info.notice.kind === 'fallback'"
+          type="button"
+          :disabled="busy"
+          @click="openExisting"
+        >
+          重新选择…
+        </button>
+        <button type="button" :disabled="busy" @click="dismissNotice(info.notice.kind === 'fallback')">
+          {{ info.notice.kind === 'fallback' ? '使用默认库' : '知道了' }}
+        </button>
+      </div>
+    </div>
 
     <p class="path">
       <span class="label">当前路径</span>
@@ -98,6 +133,43 @@ onMounted(refresh)
 </template>
 
 <style scoped>
+.notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--bg-input);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.notice.fallback {
+  border-color: var(--danger);
+}
+
+.notice.cloud-sync {
+  border-color: var(--accent);
+}
+
+.notice-text {
+  margin: 0;
+  color: var(--text);
+}
+
+.notice-path {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.notice-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .library h3 {
   margin: 0 0 12px;
   font-size: 12px;
