@@ -171,8 +171,8 @@ footer {
   border: 0;
   border-radius: 6px;
   padding: 6px 14px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-text);
+  color: var(--accent-contrast);
   font-size: 12px;
   cursor: pointer;
 }

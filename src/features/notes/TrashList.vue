@@ -49,7 +49,7 @@ const notes = useNotesStore()
   padding: 0;
   font-size: 11px;
   font-weight: 500;
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
 }
 

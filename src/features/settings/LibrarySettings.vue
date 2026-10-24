@@ -152,7 +152,7 @@ button:disabled {
 .message {
   margin: 10px 0 0;
   font-size: 11.5px;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .hint {

@@ -63,3 +63,9 @@ ANY --tray Quit--> exit(0)
 编辑器（`NoteEditor.vue`）的主题拆成两半：`editorTheme.ts` 的 `editorChrome` 只用
 CSS 令牌（行号、选区、搜索面板都随主题/强调色变），语法色则放进 `Compartment`，
 `settings.resolvedTheme` 变化时 `reconfigure`，不重建 `EditorView`（D17）。
+
+外观令牌（`src/styles/tokens.css`）按用途拆开：`--accent` 只做填充与描边，
+文字与按钮走 `--accent-text` + `--accent-contrast`，因为同一个值无法同时满足
+「文字对白底 ≥ 4.5:1」和「品牌填充足够醒目」。`src/styles/tokens.test.ts` 解析
+该 CSS，把 `--bg-input` / `--selected` / `--accent-soft` 与 `--bg` 合成后，对每个
+文本令牌 × 每个表面 × 主题 × 强调色断言 AA 比值；改令牌时测试会指出具体组合（D18）。

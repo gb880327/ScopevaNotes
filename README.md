@@ -57,6 +57,7 @@ src-tauri/
 启动静默、退出确认（先 flush 再确认）、关闭即隐藏、窗口居中/置顶/尺寸记忆、
 笔记库打开/新建/迁移/备份与占用统计、开机启动开关、FTS5 搜索（中文逐字索引）、
 预览安全（html:false + 协议白名单）与 Shiki 按需语法高亮、CodeMirror 主题联动
-（编辑器与预览随深浅色同步换色）。
+（编辑器与预览随深浅色同步换色）、全站文字对比度守门（`src/styles/tokens.test.ts`
+对文本令牌 × 表面 × 主题 × 强调色断言 WCAG AA）。
 
-未完成：签名分发、macOS 实机交互验收。剩余工作见 `openspec/changes/v1-notes-manager/tasks.md` 未勾选项。
+未完成：签名分发、macOS 实机交互验收（窗口/快捷键/菜单栏观感需实机确认）。剩余工作见 `openspec/changes/v1-notes-manager/tasks.md` 未勾选项。

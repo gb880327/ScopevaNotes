@@ -126,7 +126,7 @@ const notes = useNotesStore()
 .link {
   border: 0;
   background: none;
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
   padding: 0 2px;
   font-size: inherit;

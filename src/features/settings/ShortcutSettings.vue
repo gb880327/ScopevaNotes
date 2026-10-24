@@ -123,7 +123,7 @@ async function reset() {
   background: none;
   padding: 0;
   font-size: 11.5px;
-  color: var(--accent);
+  color: var(--accent-text);
   cursor: pointer;
 }
 

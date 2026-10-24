@@ -6,13 +6,17 @@
   --border: #e3e3e8;
   --border-strong: #d2d2d7;
   --text: #1d1d1f;
-  --text-muted: #6e6e73;
-  --text-faint: #8e8e93;
+  --text-muted: #5f5f66;
+  --text-faint: #68686e;
   --hover: rgba(0, 0, 0, 0.045);
-  --selected: rgba(0, 0, 0, 0.07);
+  --selected: rgba(0, 0, 0, 0.05);
+  /* Brand fill: dots, selection tints, focus rings. Never text on light surfaces. */
   --accent: #0a84ff;
+  /* Readable accent for text/icons, and the fill behind --accent-contrast. */
+  --accent-text: #0a66c2;
+  --accent-contrast: #ffffff;
   --accent-soft: rgba(10, 132, 255, 0.12);
-  --danger: #d70015;
+  --danger: #cc0013;
   --code-bg: #f6f6f8;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06);
   --editor-font-size: 14px;
@@ -28,30 +32,50 @@
   --border: #38383a;
   --border-strong: #48484a;
   --text: #f2f2f7;
-  --text-muted: #a1a1a6;
-  --text-faint: #8e8e93;
+  --text-muted: #b0b0b6;
+  --text-faint: #a3a3a9;
   --hover: rgba(255, 255, 255, 0.05);
   --selected: rgba(255, 255, 255, 0.09);
   --accent: #0a84ff;
+  --accent-text: #54a6ff;
+  --accent-contrast: #0d0d0f;
   --accent-soft: rgba(10, 132, 255, 0.22);
-  --danger: #ff453a;
+  --danger: #ff7a72;
   --code-bg: #26262a;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.4);
 }
 
 [data-accent='purple'] {
   --accent: #bf5af2;
+  --accent-text: #952fc9;
   --accent-soft: rgba(191, 90, 242, 0.16);
 }
 [data-accent='green'] {
   --accent: #30d158;
+  --accent-text: #1a7f37;
   --accent-soft: rgba(48, 209, 88, 0.16);
 }
 [data-accent='orange'] {
   --accent: #ff9f0a;
+  --accent-text: #96590a;
   --accent-soft: rgba(255, 159, 10, 0.18);
 }
 [data-accent='graphite'] {
   --accent: #8e8e93;
+  --accent-text: #67676c;
   --accent-soft: rgba(142, 142, 147, 0.18);
+}
+
+/* Dark theme keeps the same brand fills but needs lighter accent text. */
+[data-theme='dark'][data-accent='purple'] {
+  --accent-text: #d68cff;
+}
+[data-theme='dark'][data-accent='green'] {
+  --accent-text: #6ee08a;
+}
+[data-theme='dark'][data-accent='orange'] {
+  --accent-text: #ffc266;
+}
+[data-theme='dark'][data-accent='graphite'] {
+  --accent-text: #b0b0b6;
 }
