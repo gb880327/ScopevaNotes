@@ -30,7 +30,7 @@
 
 ### Requirement: 全局快捷键唤出
 
-系统 MUST 注册默认全局快捷键 `CommandOrControl+Shift+Space` 用于切换主窗口显隐；注册失败 MUST NOT 阻断启动，MUST 以可见提示告知快捷键不可用。快捷键 MUST 可在设置中修改，且 MUST 拒绝已被系统占用的组合。
+系统 MUST 注册默认全局快捷键 `CommandOrControl+Shift+D` 用于切换主窗口显隐；注册失败 MUST NOT 阻断启动，MUST 以可见提示告知快捷键不可用。快捷键 MUST 可在设置中修改，且 MUST 拒绝已被系统占用的组合。
 
 #### Scenario: 隐藏时唤出
 - **WHEN** 窗口处于隐藏状态且用户按下快捷键
@@ -68,9 +68,9 @@
 - **WHEN** 用户在菜单栏选择「新建笔记」
 - **THEN** 窗口显示并进入新建笔记的编辑状态，聚焦标题
 
-#### Scenario: 图标适配深浅色
-- **WHEN** 系统切换到深色或浅色菜单栏
-- **THEN** 菜单栏图标保持清晰可见（模板图标染色行为）
+#### Scenario: 菜单栏显示品牌标识
+- **WHEN** 应用运行于菜单栏
+- **THEN** 显示品牌 logo（蓝色圆角方块标记），高度约 18pt、按等比缩放，在深浅色菜单栏下都能辨认
 
 ### Requirement: 单实例
 

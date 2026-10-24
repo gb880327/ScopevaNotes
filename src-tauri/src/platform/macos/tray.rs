@@ -1,22 +1,23 @@
 use tauri::{
+    image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, Runtime,
 };
 
-use crate::models::AppResult;
+use crate::models::{AppError, AppResult};
 use crate::state::AppState;
 
-/// macOS tray. TODO(M0): replace the default app icon with a monochrome
-/// template icon (32x32 @2x, `isTemplate = true`) before release.
+/// Brand mark used in the menu bar. Rendered by AppKit at 18pt height, so a
+/// high-resolution source stays sharp on Retina displays. The logo is a
+/// colored rounded square, hence `icon_as_template(false)`: a template icon
+/// would collapse it into a solid silhouette.
+const TRAY_ICON: &[u8] = include_bytes!("../../../icons/tray-logo.png");
+
 pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
-    let toggle = MenuItem::with_id(
-        app,
-        "toggle",
-        "显示 / 隐藏窗口",
-        true,
-        Some("CommandOrControl+Shift+Space"),
-    )?;
+    // No accelerator label here: the shortcut is user-configurable, and a
+    // stale hint is worse than none. Settings shows the live value.
+    let toggle = MenuItem::with_id(app, "toggle", "显示 / 隐藏窗口", true, None::<&str>)?;
     let new_note = MenuItem::with_id(app, "new_note", "新建笔记", true, Some("CommandOrControl+N"))?;
     let library = MenuItem::with_id(app, "library", "笔记库…", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "设置…", true, Some("CommandOrControl+,"))?;
@@ -28,14 +29,12 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
         &[&toggle, &new_note, &separator, &library, &settings, &separator, &quit],
     )?;
 
-    let icon = app
-        .default_window_icon()
-        .cloned()
-        .ok_or_else(|| crate::models::AppError::Other("missing default window icon".into()))?;
+    let icon = Image::from_bytes(TRAY_ICON)
+        .map_err(|err| AppError::Other(format!("tray icon decode failed: {err}")))?;
 
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
-        .icon_as_template(true)
+        .icon_as_template(false)
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {

@@ -75,6 +75,10 @@ export const api = {
     call<number>('backup_library', { destination }),
 
   toggleMainWindow: () => call<boolean>('toggle_main_window'),
+
+  getGlobalShortcut: () => call<string>('get_global_shortcut'),
+  setGlobalShortcut: (accelerator: string) =>
+    call<string>('set_global_shortcut', { accelerator }),
 }
 
 export function errorMessage(err: unknown): string {

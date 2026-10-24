@@ -53,7 +53,11 @@ pub fn run() {
                     (db, info)
                 }
             };
-            app.manage(AppState::new(db, info));
+            app.manage(AppState::new(
+                db,
+                info,
+                shortcuts::DEFAULT_SHORTCUT.to_string(),
+            ));
 
             tray::setup(&handle)?;
             if let Err(err) = shortcuts::register(&handle, shortcuts::DEFAULT_SHORTCUT) {
@@ -98,6 +102,8 @@ pub fn run() {
             commands::libraries::move_library,
             commands::libraries::backup_library,
             commands::window::toggle_main_window,
+            commands::shortcuts::get_global_shortcut,
+            commands::shortcuts::set_global_shortcut,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

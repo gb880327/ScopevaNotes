@@ -23,6 +23,7 @@ let unlisten: UnlistenFn[] = []
 
 onMounted(async () => {
   await settings.hydrate()
+  await settings.applyShortcut()
   await notes.refresh()
   await notes.refreshTags()
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useUiStore } from '@/stores/ui'
 import AppearanceSettings from './AppearanceSettings.vue'
+import ShortcutSettings from './ShortcutSettings.vue'
 import LibrarySettings from './LibrarySettings.vue'
 
 const ui = useUiStore()
@@ -15,6 +16,8 @@ const ui = useUiStore()
       </header>
       <div class="body">
         <AppearanceSettings />
+        <hr />
+        <ShortcutSettings />
         <hr />
         <LibrarySettings />
       </div>
