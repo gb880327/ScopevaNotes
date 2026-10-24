@@ -2,16 +2,22 @@
 
 macOS local-first Markdown notes + code-snippet manager. Tauri 2 (Rust) + Vue 3 + SQLite.
 
-产品范围与验收标准以 OpenSpec 为准。两个 change 都已归档，**`openspec/specs/` 是当前生效的基线**
+产品范围与验收标准以 OpenSpec 为准。**`openspec/specs/` 是当前生效的基线**
 （8 个 capability：appearance、library、macos-shell、markdown-editing、markdown-import、
-notes-core、release-readiness、search）；归档副本保留决策与验收记录：
+notes-core、release-readiness、search）。归档副本保留决策与验收记录：
 
 - [`openspec/changes/archive/2026-10-24-v1-notes-manager/`](openspec/changes/archive/2026-10-24-v1-notes-manager/)：v1 笔记管理器（70/70，design D1–D20、`verification.md`）
 - [`openspec/changes/archive/2026-10-24-add-markdown-import/`](openspec/changes/archive/2026-10-24-add-markdown-import/)：批量导入 Markdown（24/26，design D1–D14、`verification.md`）
 
+规划中（只有规划产物，尚未实现）：
+
+- [`openspec/changes/add-tag-management/`](openspec/changes/add-tag-management/)：标签的集中管理（新增 / 重命名 / 改色 / 删除）与笔记标签编辑
+- [`openspec/changes/add-trash-purge/`](openspec/changes/add-trash-purge/)：回收站出口（单条永久删除 / 清空垃圾箱）
+
 ```bash
-openspec validate --all --strict               # 8 个基线规格 + 归档校验
-openspec list                                   # 活跃 change（当前为空）
+openspec validate --all --strict               # 基线规格 + 全部 change
+openspec list                                   # 活跃 change 与任务进度
+openspec status --change add-tag-management     # 单个 change 的产物状态
 ```
 
 改行为时先改基线规格：新建 change（`openspec new change <name>`）或直接编辑
