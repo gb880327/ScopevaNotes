@@ -18,8 +18,15 @@ Extra gates by change type:
 
 Rules the spec enforces (do not violate to make a checklist green):
 - Never mark a task `[x]` in `openspec/changes/v1-notes-manager/tasks.md` unless it was actually
-  verified; macOS UI items that need Screen Recording/Accessibility permissions are left unchecked
-  and reported as manual steps.
+  verified; macOS UI items that need Screen Recording/Accessibility permissions stay unchecked and
+  are reported as manual steps.
+- Exception, and the only one: the user can accept an unverified item. Then the task is marked
+  `[x]` **with the literal annotation `用户接受（未实机验证）`**, the blocker, and the code-level
+  evidence that does exist — never a bare `[x]`. The matching scenario in `verification.md` changes
+  from `待人工` to `用户接受`, and the decision lands in design D20 (v1 closed this way: 6.9/8.3/8.4
+  accepted, 9.2 signing dropped as local-only distribution).
+- v1 scope is a local-only app: ad-hoc `codesign --sign -`, no Developer ID, no notarization. Do not
+  describe the artefacts as distributable.
 - Report commands run + their outcome, and name what stayed unverified.
 
 ## Where acceptance evidence lives
