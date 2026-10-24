@@ -9,8 +9,8 @@
 隐藏到菜单栏后，应用 MUST 在 24 小时驻留中保持稳定：空闲 CPU MUST 接近 0，内存 MUST NOT 随驻留时间持续增长。
 
 #### Scenario: 空闲驻留
-- **WHEN** 应用隐藏到菜单栏并空闲 24 小时
-- **THEN** 进程无持续 CPU 占用，内存曲线无单调增长
+- **WHEN** 应用隐藏到菜单栏并空闲
+- **THEN** 进程无持续 CPU 占用，内存曲线无单调增长（v1 以 `scripts/perf-check.sh soak` 采样，采样时长由发布者决定，见 D20）
 
 ### Requirement: 唤出与启动延迟
 
@@ -18,7 +18,7 @@
 
 #### Scenario: 热唤出延迟
 - **WHEN** 应用已驻留且用户按下全局快捷键
-- **THEN** 窗口在 200ms 内可见并可接受键盘输入
+- **THEN** 窗口在 200ms 内可见并可接受键盘输入（该指标无法自动化，由发布者按键实测，见 D20）
 
 ### Requirement: 数据安全演练
 
@@ -34,15 +34,15 @@
 
 ### Requirement: 打包与分发
 
-构建 MUST 产出可运行的 `.app`（开发阶段允许仅本地构建）；对外分发 MUST 使用 Developer ID 签名并完成公证，MUST NOT 依赖未签名的调试构建。
+构建 MUST 产出可运行的 `.app`。v1 的交付形态是**本机自用**：产物使用 ad-hoc 签名（`codesign --sign -`），不做 Developer ID 签名与 notarization——这不是遗漏，是范围决定（见 design D20）。若将来对外分发，该变更 MUST 补齐签名、公证与 Gatekeeper 校验，并在此之前不得声称产物可对外分发。
 
 #### Scenario: 本地构建可用
 - **WHEN** 执行发布构建
-- **THEN** 生成的 `.app` 可在未安装开发工具链的机器上启动并读写笔记
+- **THEN** 生成的 `.app` 可在本机启动并读写笔记，`lipo -info` 显示目标架构
 
-#### Scenario: 分发版本通过校验
-- **WHEN** 用户从网络下载分发版本首次打开
-- **THEN** 系统不出现「无法验证开发者」阻断
+#### Scenario: 本机自用不做签名公证
+- **WHEN** 用户把构建产物放到另一台机器或经网络传输
+- **THEN** 发布文档明确说明当前只有 ad-hoc 签名、需要 `xattr -dr com.apple.quarantine` 或右键打开，且这不是受支持的对外分发方式
 
 ### Requirement: 发布文档
 

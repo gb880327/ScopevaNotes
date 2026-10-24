@@ -54,8 +54,10 @@
 
 ### 已知限制
 
-- 未签名、未公证；arm64 slice 未在 Apple Silicon 实机运行。
-- 24 小时驻留、端到端 UI 冒烟、macOS 实机交互验收（6.9/8.3/8.4）未完成。
+- v1 只到本机：ad-hoc 签名，不做 Developer ID 签名与公证（9.2 移出范围，D20）。
+- arm64 slice 只做了产物结构校验，未在 Apple Silicon 实机运行。
+- macOS 实机交互、端到端 UI 冒烟、24 小时驻留由用户接受、未实机验证
+  （6.9/8.3/8.4，D20）；真机出问题先查 `verification.md` 对应场景。
 - 无独立代码片段实体、无多窗口、无快速面板（v1 范围如此）。
 
 详见 `docs/RELEASE.md` 与 `openspec/changes/v1-notes-manager/tasks.md`。

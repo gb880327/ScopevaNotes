@@ -21,8 +21,9 @@ pnpm tauri build --target universal-apple-darwin   # Intel + Apple Silicon 通�
 | 通用 `.dmg` | `src-tauri/target/universal-apple-darwin/release/bundle/dmg/Notes_0.1.0_universal.dmg` |
 
 通用包需要先 `rustup target add aarch64-apple-darwin`。当前构建**只有 ad-hoc 签名**
-（`codesign --force --deep --sign -`），没有 Developer ID 与 notarization：本机可以
-直接运行，拷到别的机器会被 Gatekeeper 拦下。首次手动放行：
+（`codesign --force --deep --sign -`），没有 Developer ID 与 notarization——这是 v1 的
+范围决定（design D20：只做本机自用），不是待办：本机可以直接运行，拷到别的机器会被
+Gatekeeper 拦下，且这不是受支持的分发方式。首次手动放行：
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Notes.app   # 或右键 → 打开
@@ -65,12 +66,15 @@ xattr -dr com.apple.quarantine /Applications/Notes.app   # 或右键 → 打开
 
 ## 已知限制
 
-- 未签名、未公证（9.2 未完成），只在构建机上验证过运行。
+- **只在本机使用**：ad-hoc 签名，不做 Developer ID 签名与公证（9.2 移出 v1 范围，
+  design D20）。产物可以拷到别的机器手动放行运行，但那不是受支持的分发方式。
 - Intel 包在本机实测启动；arm64 slice 只做了产物校验，未在 Apple Silicon 上运行。
-- 24 小时驻留测量未完成（`scripts/perf-check.sh soak 24`），现有数据是
-  10 分钟空闲采样（0.00% CPU、RSS 41.7 MB）与启动里程碑测量。
-- 端到端 UI 冒烟（8.3）与 macOS 实机交互验收（6.9：快捷键连按、多显示器、
-  Spaces/Stage Manager、菜单栏观感）需要人工在真机完成。
+- 驻留测量：已有 10 分钟空闲采样（0.00% CPU、RSS 52.3 → 41.7 MB 后稳定）与启动里程碑
+  （进程 0.19 s、开库 0.74 s），未跑满 24 小时；需要更长曲线时执行
+  `scripts/perf-check.sh soak 24`。
+- macOS 实机交互（快捷键连按、多显示器、Spaces/Stage Manager、菜单栏观感）与端到端
+  UI 冒烟由用户接受、**尚未人工验证**（6.9/8.3，design D20）；使用中发现问题先从
+  `openspec/changes/v1-notes-manager/verification.md` 的对应场景查起。
 - 预览高亮超过 2 万字符的代码块会退回纯文本；编辑器内代码围栏不着色（由预览承担）。
 - 只有「笔记」一个实体，没有独立代码片段库、没有多窗口、没有快速面板。
 
