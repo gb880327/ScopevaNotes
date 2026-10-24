@@ -12,6 +12,10 @@ pub struct AppState {
     /// `lib.rs` lets the process die instead of asking again.
     quitting: AtomicBool,
     quit_pending: AtomicBool,
+    /// One import at a time; the flag is also the cancel signal the background
+    /// thread polls between files and batches (design D12).
+    import_running: Arc<AtomicBool>,
+    import_cancel: Arc<AtomicBool>,
     pub window: crate::platform::macos::window_manager::WindowManager,
 }
 
@@ -23,6 +27,8 @@ impl AppState {
             shortcut: Mutex::new(shortcut),
             quitting: AtomicBool::new(false),
             quit_pending: AtomicBool::new(false),
+            import_running: Arc::new(AtomicBool::new(false)),
+            import_cancel: Arc::new(AtomicBool::new(false)),
             window: Default::default(),
         }
     }
@@ -77,6 +83,47 @@ impl AppState {
 
     pub fn end_quit_prompt(&self) {
         self.quit_pending.store(false, Ordering::SeqCst);
+    }
+
+    /// Claim the single import slot. `None` means an import is already running.
+    pub fn begin_import(&self) -> Option<ImportGuard> {
+        if self
+            .import_running
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return None;
+        }
+        self.import_cancel.store(false, Ordering::SeqCst);
+        Some(ImportGuard {
+            running: self.import_running.clone(),
+            cancel: self.import_cancel.clone(),
+        })
+    }
+
+    pub fn request_import_cancel(&self) {
+        self.import_cancel.store(true, Ordering::SeqCst);
+    }
+}
+
+/// Owns the import slot for the lifetime of one import. `Drop` clears both
+/// flags, so an early error or a panic cannot leave the app stuck on
+/// "an import is running".
+pub struct ImportGuard {
+    running: Arc<AtomicBool>,
+    cancel: Arc<AtomicBool>,
+}
+
+impl ImportGuard {
+    pub fn cancel_flag(&self) -> Arc<AtomicBool> {
+        self.cancel.clone()
+    }
+}
+
+impl Drop for ImportGuard {
+    fn drop(&mut self) {
+        self.cancel.store(false, Ordering::SeqCst);
+        self.running.store(false, Ordering::SeqCst);
     }
 }
 

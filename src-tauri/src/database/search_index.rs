@@ -5,6 +5,17 @@ use crate::models::AppResult;
 /// Rebuild the FTS projection for exactly one note inside the caller's write
 /// transaction. Soft-deleted notes are removed from the index.
 pub fn reindex_note(conn: &Connection, note_id: &str) -> AppResult<()> {
+    conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", [note_id])?;
+    index_new_note(conn, note_id)
+}
+
+/// Appends the FTS row for a note that cannot already be indexed.
+///
+/// Identical to [`reindex_note`] minus the delete: `note_id` is UNINDEXED, so
+/// every delete is a full scan of the FTS table. For a brand-new note (the
+/// import path) there is nothing to remove, which turns the O(n²) whole-import
+/// cost into O(n).
+pub fn index_new_note(conn: &Connection, note_id: &str) -> AppResult<()> {
     let row = conn
         .query_row(
             "SELECT title, content, deleted_at FROM notes WHERE id = ?1",
@@ -18,8 +29,6 @@ pub fn reindex_note(conn: &Connection, note_id: &str) -> AppResult<()> {
             },
         )
         .optional()?;
-
-    conn.execute("DELETE FROM notes_fts WHERE note_id = ?1", [note_id])?;
 
     let Some((title, content, deleted_at)) = row else {
         return Ok(());
@@ -83,7 +92,13 @@ pub fn reindex_all(conn: &mut Connection) -> AppResult<()> {
                                   WHERE nt.note_id = n.id), '')
                  FROM notes n WHERE n.id = ?1 AND n.deleted_at IS NULL",
                 [&id],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                },
             )
             .optional()?;
         if let Some((title, content, tags_text)) = row {
@@ -174,10 +189,7 @@ mod tests {
         // Punctuation cannot reach the parser; `100%` becomes the prefix `100`.
         assert_eq!(to_match_query("100%").as_deref(), Some("\"100\"*"));
         assert_eq!(to_match_query("C++").as_deref(), Some("\"C\"*"));
-        assert_eq!(
-            to_match_query("a_b").as_deref(),
-            Some("\"a\"* AND \"b\"*")
-        );
+        assert_eq!(to_match_query("a_b").as_deref(), Some("\"a\"* AND \"b\"*"));
     }
 
     #[test]

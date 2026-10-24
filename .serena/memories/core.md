@@ -13,9 +13,12 @@ macOS local-first Markdown notes + code snippets. Two halves in one repo:
 - Bundle identifier `com.scopeva.notes`; bundle targets `app` + `dmg`, min macOS 12, unsigned.
 
 ## Where truth lives
-- Acceptance baseline: OpenSpec change `openspec/changes/v1-notes-manager/` (see `mem:specs_workflow`).
+- Acceptance baseline: `openspec/specs/` (8 capabilities). History and rationale live in the archived changes
+  under `openspec/changes/archive/` (`2026-10-24-v1-notes-manager`, `2026-10-24-add-markdown-import`).
+  See `mem:specs_workflow`.
 - `docs/ARCHITECTURE.md` is a code-level reference only, never the spec.
-- Decision log D1-D15 inside `openspec/changes/v1-notes-manager/design.md`.
+- Decision logs: D1-D20 in `openspec/changes/archive/2026-10-24-v1-notes-manager/design.md`,
+  D1-D14 in `openspec/changes/archive/2026-10-24-add-markdown-import/design.md`.
 
 ## Memory map
 - Stack, version pins, toolchain: `mem:tech_stack`.

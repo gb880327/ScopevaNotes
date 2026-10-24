@@ -2,6 +2,9 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import type {
   AppError,
   AppErrorKind,
+  ImportOptions,
+  ImportPreview,
+  ImportReport,
   LibraryInfo,
   ListNotesArgs,
   NoteDetail,
@@ -86,6 +89,15 @@ export const api = {
   getGlobalShortcut: () => call<string>('get_global_shortcut'),
   setGlobalShortcut: (accelerator: string) =>
     call<string>('set_global_shortcut', { accelerator }),
+
+  /** Read-only preview of a directory; never writes. */
+  importScan: (path: string) => call<ImportPreview>('import_scan', { path }),
+  importNotes: (path: string, options: ImportOptions = {}) =>
+    call<ImportReport>('import_notes', { path, options }),
+  /** Stops a running import at the next file/batch boundary. */
+  cancelImport: () => call<void>('cancel_import'),
+  /** Undo one batch: soft delete, so the notes stay restorable from the trash. */
+  deleteImportBatch: (tag: string) => call<number>('delete_import_batch', { tag }),
 
   /** Ask for the quit confirmation dialog; the app exits only if confirmed. */
   requestQuit: () => call<void>('request_quit'),

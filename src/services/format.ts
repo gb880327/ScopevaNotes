@@ -27,3 +27,13 @@ export function formatBytes(bytes: number): string {
   }
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`
 }
+
+/** Import report elapsed time: 850 ms / 3.4 s / 1 分 12 秒. */
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)} 毫秒`
+  const seconds = ms / 1000
+  if (seconds < 60) return `${seconds.toFixed(1)} 秒`
+  const minutes = Math.floor(seconds / 60)
+  const rest = Math.round(seconds % 60)
+  return `${minutes} 分 ${rest} 秒`
+}

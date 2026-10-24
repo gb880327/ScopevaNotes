@@ -108,6 +108,33 @@ describe('notes store list ordering', () => {
   })
 })
 
+describe('notes store after an external write', () => {
+  it('a refresh issued after an import replaces the list and drops the older page', async () => {
+    const beforeImport = deferred<{ items: NoteSummary[]; nextCursor: null }>()
+    listNotes
+      .mockReturnValueOnce(beforeImport.promise)
+      .mockResolvedValueOnce({
+        items: [summary('imported-1'), summary('imported-2'), summary('note-old')],
+        nextCursor: null,
+      })
+
+    const store = useNotesStore()
+    const stale = store.refresh()
+
+    // The importer finished and the dialog called refresh() again.
+    const fresh = store.refresh()
+    await fresh
+    beforeImport.resolve({ items: [summary('note-old')], nextCursor: null })
+    await stale
+
+    expect(store.items.map((item) => item.id)).toEqual([
+      'imported-1',
+      'imported-2',
+      'note-old',
+    ])
+  })
+})
+
 describe('notes store optimistic concurrency', () => {
   it('keeps the buffer typed during a save in flight when the response lands', async () => {
     const inflight = deferred<{

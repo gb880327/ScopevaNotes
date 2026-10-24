@@ -7,6 +7,7 @@ export type ViewMode = 'read' | 'edit'
 export const useUiStore = defineStore('ui', () => {
   const viewMode = ref<ViewMode>('read')
   const settingsOpen = ref(false)
+  const importOpen = ref(false)
   const searchFocusToken = ref(0)
 
   function focusSearch() {
@@ -17,9 +18,23 @@ export const useUiStore = defineStore('ui', () => {
     settingsOpen.value = true
   }
 
+  function openImport() {
+    settingsOpen.value = false
+    importOpen.value = true
+  }
+
   function toggleEdit() {
     viewMode.value = viewMode.value === 'edit' ? 'read' : 'edit'
   }
 
-  return { viewMode, settingsOpen, searchFocusToken, focusSearch, openSettings, toggleEdit }
+  return {
+    viewMode,
+    settingsOpen,
+    importOpen,
+    searchFocusToken,
+    focusSearch,
+    openSettings,
+    openImport,
+    toggleEdit,
+  }
 })

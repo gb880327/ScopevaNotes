@@ -29,5 +29,5 @@
 - User-facing strings are Chinese; comments/identifiers are English. Match the surrounding language.
 
 ## Spec discipline
-- Behaviour changes require a spec/design/tasks edit in `openspec/changes/v1-notes-manager/` in the same
+- Behaviour changes require a spec edit in `openspec/specs/<capability>/spec.md` (or a new change) in the same
   piece of work; tick `tasks.md` only for work actually verified (see `mem:task_completion`).

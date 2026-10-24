@@ -22,6 +22,12 @@ const ui = useUiStore()
         <hr />
         <StartupSettings />
         <hr />
+        <section class="section">
+          <h3>迁移</h3>
+          <p>从其他应用（例如 Obsidian）的目录一次性导入 Markdown 文件。</p>
+          <button type="button" @click="ui.openImport()">导入 Markdown…</button>
+        </section>
+        <hr />
         <LibrarySettings />
       </div>
     </div>
@@ -79,5 +85,29 @@ hr {
   border: 0;
   border-top: 1px solid var(--border);
   margin: 16px 0;
+}
+
+.section h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.section p {
+  margin: 0 0 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.section button {
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
 }
 </style>

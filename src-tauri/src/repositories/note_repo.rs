@@ -254,6 +254,53 @@ pub fn create(
     get(conn, &id)
 }
 
+/// One row produced by the Markdown importer. `created_at` / `updated_at` come
+/// from the file system, not from `now()`, so an imported library keeps its
+/// original ordering (design D6).
+pub struct ImportRow<'a> {
+    pub source_path: &'a str,
+    pub content_hash: &'a str,
+    pub title: &'a str,
+    pub content: &'a str,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub tag_ids: &'a [String],
+}
+
+/// Insert an imported note inside the caller's transaction so the importer can
+/// commit one batch at a time (design D4). Goes through the same tag and FTS
+/// projection path as `create`, so search behaves identically (design D9).
+pub fn insert_imported(conn: &Connection, row: &ImportRow<'_>) -> AppResult<String> {
+    let id = Uuid::now_v7().to_string();
+    conn.execute(
+        "INSERT INTO notes(id, title, content, created_at, updated_at, source_path, content_hash)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            id,
+            row.title,
+            row.content,
+            row.created_at,
+            row.updated_at,
+            row.source_path,
+            row.content_hash
+        ],
+    )?;
+    replace_tags(conn, &id, row.tag_ids)?;
+    // Brand-new note: append-only index write (see `index_new_note`).
+    search_index::index_new_note(conn, &id)?;
+    Ok(id)
+}
+
+/// Retry safety: a file that already has a note is skipped, not duplicated.
+pub fn source_path_exists(conn: &Connection, source_path: &str) -> AppResult<bool> {
+    let exists: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM notes WHERE source_path = ?1)",
+        [source_path],
+        |row| row.get(0),
+    )?;
+    Ok(exists)
+}
+
 pub fn update(
     conn: &mut Connection,
     id: &str,
@@ -331,6 +378,35 @@ pub fn restore(conn: &mut Connection, id: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// Undo one import batch: everything carrying the batch tag goes to the trash
+/// (soft delete, so it stays restorable). The tag name is validated by the
+/// caller — this is a destructive-by-design selector.
+pub fn soft_delete_by_tag(conn: &mut Connection, tag_name: &str) -> AppResult<usize> {
+    let tx = conn.transaction()?;
+    let ids: Vec<String> = {
+        let mut stmt = tx.prepare(
+            "SELECT n.id FROM notes n
+             JOIN note_tags nt ON nt.note_id = n.id
+             JOIN tags t ON t.id = nt.tag_id
+             WHERE t.name = ?1 AND n.deleted_at IS NULL",
+        )?;
+        let rows = stmt
+            .query_map([tag_name], |row| row.get(0))?
+            .collect::<Result<_, _>>()?;
+        rows
+    };
+    let now = now_ms();
+    for id in &ids {
+        tx.execute(
+            "UPDATE notes SET deleted_at = ?2, updated_at = ?2 WHERE id = ?1",
+            params![id, now],
+        )?;
+        search_index::reindex_note(&tx, id)?;
+    }
+    tx.commit()?;
+    Ok(ids.len())
+}
+
 pub fn replace_tags(conn: &Connection, note_id: &str, tag_ids: &[String]) -> AppResult<()> {
     conn.execute("DELETE FROM note_tags WHERE note_id = ?1", [note_id])?;
     for tag_id in tag_ids {
@@ -382,7 +458,10 @@ fn tags_for_notes(conn: &Connection, ids: &[String]) -> AppResult<HashMap<String
 }
 
 fn placeholders(count: usize) -> String {
-    std::iter::repeat("?").take(count).collect::<Vec<_>>().join(",")
+    std::iter::repeat("?")
+        .take(count)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn escape_like(input: &str) -> String {

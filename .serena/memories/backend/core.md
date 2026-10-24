@@ -5,9 +5,10 @@
   `search_index.rs`, `backup.rs`.
 - `models/`: `note.rs`, `tag.rs` (camelCase DTOs), `error.rs` (`AppError`/`AppResult`).
 - `repositories/`: `note_repo.rs`, `tag_repo.rs` - all query + validation logic.
+- `services/import_service.rs`: batch Markdown import (discovery, decoding, frontmatter subset, batched write loop).
 - `services/library_service.rs`: resolves library path from `config.json` in `app_config_dir()`,
   creates/opens/moves/backs up, computes `LibraryInfo` (note count + on-disk size incl. `-wal`/`-shm`).
-- `commands/`: `notes`, `tags`, `libraries`, `window`, `shortcuts`, `quit`; `mod.rs` holds `blocking()`.
+- `commands/`: `notes`, `tags`, `libraries`, `window`, `shortcuts`, `quit`, `import`; `mod.rs` holds `blocking()`.
 - `platform/macos/`: `tray.rs`, `shortcuts.rs`, `window_manager.rs`, `monitor.rs` (multi-display centring).
 - `state.rs`: `AppState`; `lib.rs`: builder, plugin order, `setup`, exit interception.
 
@@ -31,7 +32,14 @@
 - Tray has a `CheckMenuItem` for autostart whose state is **re-read from the system**
   (`app.autolaunch().is_enabled()`) after every toggle; the item handle must be cloned into the closure
   because `AppHandle` has no `app.menu()`.
-- Tray events are menu ids: `toggle`, `new_note`, `library`, `settings`, `autostart`, `quit`.
+- Tray events are menu ids: `toggle`, `new_note`, `import`, `library`, `settings`, `autostart`, `quit`.
+  `import` calls `window.show` (not the `toggle` helper): the modal needs a visible window.
+
+## Long-running work (`state.rs`)
+- One import at a time: `begin_import()` swaps an `AtomicBool` and returns an `ImportGuard` whose `Drop`
+  clears both `running` and `cancel`; `request_import_cancel()` is a no-op when nothing runs, and a stray
+  cancel flag is reset by the next `begin_import()`. Logic itself lives in `services/`, so integration
+  tests drive it without a Tauri runtime; the command layer only emits `ui://import-progress`.
 
 ## Migrations (`database/migrations.rs`)
 - Append-only `MIGRATIONS: &[(i64, &str)]` with `include_str!("../../migrations/NNNN_*.sql")`;

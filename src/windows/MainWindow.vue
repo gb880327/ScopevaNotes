@@ -6,6 +6,7 @@ import Sidebar from '@/components/layout/Sidebar.vue'
 import SidebarSplitter from '@/components/layout/SidebarSplitter.vue'
 import ContentPane from '@/components/layout/ContentPane.vue'
 import SettingsDialog from '@/features/settings/SettingsDialog.vue'
+import ImportDialog from '@/features/import/ImportDialog.vue'
 import { useNotesStore } from '@/stores/notes'
 import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
@@ -33,6 +34,7 @@ onMounted(async () => {
       listen('ui://new-note', () => void notes.createNote()),
       listen('ui://open-settings', () => ui.openSettings()),
       listen('ui://open-library', () => ui.openSettings()),
+      listen('ui://import-markdown', () => ui.openImport()),
       listen('ui://quit-requested', () => void handleQuitRequest()),
     ])
   }
@@ -72,6 +74,7 @@ onBeforeUnmount(() => {
     <SidebarSplitter />
     <ContentPane />
     <SettingsDialog />
+    <ImportDialog />
   </div>
 </template>
 

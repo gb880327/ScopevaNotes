@@ -7,6 +7,9 @@ Pipeline (`note_repo::list` + `database/search_index.rs`): FTS5 `MATCH` coarse f
   whole FTS table per outer row: 10k notes -> 54 s for one query. Use `n.id IN (SELECT note_id FROM notes_fts WHERE notes_fts MATCH ?)`.
   Same trap in rebuilds: deleting each row with `DELETE ... WHERE note_id = ?` makes a rebuild O(n^2) (34 s vs 1.07 s), so
   `reindex_all` empties the table once and only inserts.
+- Consequence for **bulk insert**: never call `reindex_note` (delete-then-insert) in a loop; that drives the same O(n^2)
+  scan. `index_new_note` is the append-only entry point and is only correct for ids that cannot have a row yet
+  (bulk import: 5,000 notes 9.52 s -> 2.12 s). It shares `insert_row` with `reindex_note`, so index format stays single-sourced.
 - Tags are matched via `note_tags`/`tags` joins, never through `notes_fts.tags_text` in a correlated EXISTS.
 - `unicode61` treats a whole CJK run as **one token**: `"笔记"` does not match `笔记管理的要点`, and prefix `"笔记"*`
   only matches at the run start. Indexing therefore stores CJK text with a space between every character

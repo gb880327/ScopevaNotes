@@ -307,3 +307,90 @@ fn search_composes_with_filters_and_skips_deleted() {
     drop(db);
     let _ = std::fs::remove_file(path);
 }
+
+/// A library created by v0.1 (schema v3) must survive the v4 upgrade: the
+/// import columns are additive, so no row is rewritten and no note is lost.
+#[test]
+fn upgrade_from_v3_preserves_notes_and_adds_import_columns() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!("macos-notes-v3-{unique}.db"));
+
+    {
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL);",
+        )
+        .unwrap();
+        for (version, sql) in [
+            (1i64, include_str!("../migrations/0001_init.sql")),
+            (2, include_str!("../migrations/0002_fts.sql")),
+            (3, include_str!("../migrations/0003_search_reindex.sql")),
+        ] {
+            conn.execute_batch(sql).unwrap();
+            conn.execute(
+                "INSERT INTO schema_migrations(version, applied_at) VALUES (?1, 0)",
+                [version],
+            )
+            .unwrap();
+        }
+        conn.execute(
+            "INSERT INTO notes(id, title, content, created_at, updated_at, is_favorite)
+             VALUES ('legacy', '旧笔记', '升级前写入的正文', 1000, 2000, 1)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO tags(id, name, created_at) VALUES ('t1', 'work', 1000)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO note_tags(note_id, tag_id) VALUES ('legacy', 't1')",
+            [],
+        )
+        .unwrap();
+    }
+
+    let db = Database::open(&path).expect("upgrade to v4");
+    db.with_conn(|conn| {
+        let (title, content, updated, favorite, source): (String, String, i64, i64, Option<String>) =
+            conn.query_row(
+                "SELECT title, content, updated_at, is_favorite, source_path FROM notes WHERE id = 'legacy'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            )?;
+        assert_eq!(title, "旧笔记");
+        assert_eq!(content, "升级前写入的正文");
+        assert_eq!(updated, 2000);
+        assert_eq!(favorite, 1);
+        assert_eq!(source, None, "hand-written notes keep a NULL source_path");
+        Ok(())
+    })
+    .expect("read legacy row");
+
+    // Two rows may not claim the same source file, but NULLs are unconstrained.
+    db.with_conn(|conn| {
+        conn.execute(
+            "INSERT INTO notes(id, title, content, created_at, updated_at, source_path)
+             VALUES ('dup-a', 'a', '', 1, 1, '/vault/a.md')",
+            [],
+        )?;
+        let dup = conn.execute(
+            "INSERT INTO notes(id, title, content, created_at, updated_at, source_path)
+             VALUES ('dup-b', 'b', '', 1, 1, '/vault/a.md')",
+            [],
+        );
+        assert!(
+            dup.is_err(),
+            "partial unique index rejects a second import of the same file"
+        );
+        Ok(())
+    })
+    .expect("unique source_path");
+
+    drop(db);
+    let _ = std::fs::remove_file(&path);
+}

@@ -21,6 +21,7 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
     // stale hint is worse than none. Settings shows the live value.
     let toggle = MenuItem::with_id(app, "toggle", "显示 / 隐藏窗口", true, None::<&str>)?;
     let new_note = MenuItem::with_id(app, "new_note", "新建笔记", true, Some("CommandOrControl+N"))?;
+    let import = MenuItem::with_id(app, "import", "导入 Markdown…", true, None::<&str>)?;
     let library = MenuItem::with_id(app, "library", "笔记库…", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "设置…", true, Some("CommandOrControl+,"))?;
     let quit = MenuItem::with_id(app, "quit", "退出 Notes", true, Some("CommandOrControl+Q"))?;
@@ -45,6 +46,7 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
             &separator,
             &autostart,
             &separator,
+            &import,
             &library,
             &settings,
             &separator,
@@ -66,6 +68,15 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
             "new_note" => {
                 let _ = app.emit("ui://new-note", ());
                 click_toggle(app);
+            }
+            // Import is not a toggle: the dialog needs a visible window.
+            "import" => {
+                if let Some(state) = app.try_state::<AppState>() {
+                    if let Err(err) = state.window.show(app) {
+                        eprintln!("[tray] show failed: {err}");
+                    }
+                }
+                let _ = app.emit("ui://import-markdown", ());
             }
             "library" => {
                 let _ = app.emit("ui://open-library", ());

@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.2.0 — 未发布
+
+### 批量导入 Markdown
+
+- 菜单栏「导入 Markdown…」与设置里的同一入口，三阶段模态：选择目录 → 进度 → 报告。
+- 只读扫描 + dry-run 预览（待导入 / 已导入跳过 / 隐藏条目 / 本地文件引用 / 无法读取）。
+- 递归发现 `.md`/`.markdown`，跳过隐藏目录（`.obsidian`、`.trash`）、`node_modules` 与符号链接并计数。
+- 解码：UTF-8 优先（去 BOM），非法时 GB18030 兜底并在报告里逐条计数。
+- frontmatter 子集解析（`title` / `tags` / `created`，支持 inline list、逗号串、block list）；
+  title 回退首个 H1，再回退文件名。
+- 时间戳取文件系统元数据（`mtime` → `updated_at`，`birthtime` → `created_at`），未来时间钳到当前，
+  导入后的列表顺序与原目录的修改时间一致。
+- 正文逐字保真：只剥离 frontmatter，`[[链接]]`、`==高亮==`、`%%注释%%`、callout、`![](...)` 全部原样保留。
+- 200 条/批提交、`ui://import-progress` 进度事件、批间响应取消（已提交批次保留），
+  重跑同一目录按 `source_path` 幂等跳过。
+- 报告列出逐文件失败原因（含路径）、按 GB18030 解码数、未迁移的本地文件引用数、耗时与本批标签。
+- 「删除本批」按 `import-YYYY-MM-DD` 标签整批软删除（进回收站，可恢复）。
+- 性能（release，20 目录 / 每篇 ~600 字中文）：1,000 条 0.49 s；5,000 条 2.12 s，
+  单批最长间隔 131 ms（导入期间自动保存的最坏等待上界，远低于 5 s `busy_timeout`）。
+  这一项顺带修掉了 `notes_fts` 的 O(n²) 写入：新笔记走 append-only 的 `index_new_note`（设计 D14）。
+- 已知限制：不迁移附件、不解析 Obsidian 扩展语法、不做同步/目录监听、同日批次共用撤销标签。
+
 ## 0.1.0 — 未发布
 
 首个可运行版本。Tauri 2 + Vue 3.5 + SQLite（rusqlite bundled，FTS5）。
@@ -60,4 +82,4 @@
   （6.9/8.3/8.4，D20）；真机出问题先查 `verification.md` 对应场景。
 - 无独立代码片段实体、无多窗口、无快速面板（v1 范围如此）。
 
-详见 `docs/RELEASE.md` 与 `openspec/changes/v1-notes-manager/tasks.md`。
+详见 `docs/RELEASE.md` 与 `openspec/changes/archive/2026-10-24-v1-notes-manager/tasks.md`。

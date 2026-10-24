@@ -17,7 +17,7 @@ Extra gates by change type:
   `pkill -f "target/debug/macos-notes"` afterwards.
 
 Rules the spec enforces (do not violate to make a checklist green):
-- Never mark a task `[x]` in `openspec/changes/v1-notes-manager/tasks.md` unless it was actually
+- Never mark a task `[x]` in a change's `tasks.md` unless it was actually
   verified; macOS UI items that need Screen Recording/Accessibility permissions stay unchecked and
   are reported as manual steps.
 - Exception, and the only one: the user can accept an unverified item. Then the task is marked
@@ -30,7 +30,7 @@ Rules the spec enforces (do not violate to make a checklist green):
 - Report commands run + their outcome, and name what stayed unverified.
 
 ## Where acceptance evidence lives
-`openspec/changes/v1-notes-manager/verification.md` maps every spec scenario (7 capabilities, 100
+Each change keeps its own `verification.md` mapping every spec scenario (v1: 7 capabilities, 100
 scenarios) to its evidence: automated test name, manual observation, or "pending". When a task is
 marked `[x]`, its scenarios must appear there as automated or observed; when a scenario has no test,
 either add one or list it as pending — do not let the matrix drift.

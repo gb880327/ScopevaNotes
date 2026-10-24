@@ -1,7 +1,7 @@
-# 发行与安装（v0.1.0）
+# 发行与安装（v0.2.0）
 
 本文件面向拿到构建产物的使用者与打包的人。产品验收标准仍以
-`openspec/changes/v1-notes-manager/` 为准。
+`openspec/specs/`（基线）与 `openspec/changes/archive/2026-10-24-v1-notes-manager/`（决策与验收记录）为准。
 
 ## 构建产物
 
@@ -37,6 +37,32 @@ xattr -dr com.apple.quarantine /Applications/Notes.app   # 或右键 → 打开
    标记文件在 `~/Library/Application Support/com.scopeva.notes/onboarding-shortcut-tip`）。
 3. 首次启动在 `~/Library/Application Support/com.scopeva.notes/notes.db`
    创建笔记库并完成迁移。
+
+## 从其他应用迁移笔记（批量导入）
+
+菜单栏菜单里的「导入 Markdown…」，或设置面板最下方的同一入口。
+
+1. 选择目录（只读：原目录里的文件不会被修改、移动或删除）。
+2. 预览统计：待导入 / 已导入跳过 / 跳过的隐藏条目 / 引用了本地文件 / 无法读取。
+3. 导入：200 条一批提交，进度条实时更新，可随时取消（停在批边界，已提交的批次保留）。
+4. 报告：成功、跳过、逐文件失败原因（含路径）、按 GB18030 解码数、未迁移的本地文件引用数、
+   耗时与本批标签。可直接「删除本批」整批撤销——走回收站，仍可恢复。
+
+行为要点与限制：
+
+- 只导入 `.md` / `.markdown`；隐藏目录（`.obsidian`、`.trash` 等）、`node_modules`、
+  符号链接会被跳过并计数。
+- **不迁移附件**：`![[img/a.png]]`、`![](...)` 等引用在正文里逐字保留，但图片文件本身
+  不会被复制。报告会给出「引用了本地文件（不迁移）」的笔记数。**请自行保留原目录**，
+  否则这些链接会失效（本版最大的已知限制）。
+- 不解析 Obsidian 扩展语法（`[[链接]]`、`==高亮==`、`%%注释%%`、callout、块引用）：
+  原文完整保留，因此预览里仍会看到这些裸语法。这是刻意选择——导入时改写正文不可逆。
+- frontmatter 只认 `title` / `tags` / `created`，其余键丢弃；时间顺序沿用文件的
+  修改时间，不按导入时间重排。
+- 不做同步、目录监听或增量导入。重跑同一目录是安全的：已导入的文件按来源路径跳过。
+- 同一天两次导入共用 `import-YYYY-MM-DD` 这一撤销粒度：撤销会一起撤销当天的两批。
+- 大库（1,000 / 5,000 条）实测耗时见 `CHANGELOG.md` 0.2.0；导入期间另一次自动保存
+  的等待上界是单批间隔（5,000 条实测 131 ms），不会撞上 5 秒的 `busy_timeout`。
 
 ## 快捷键与退出
 
@@ -74,9 +100,11 @@ xattr -dr com.apple.quarantine /Applications/Notes.app   # 或右键 → 打开
   `scripts/perf-check.sh soak 24`。
 - macOS 实机交互（快捷键连按、多显示器、Spaces/Stage Manager、菜单栏观感）与端到端
   UI 冒烟由用户接受、**尚未人工验证**（6.9/8.3，design D20）；使用中发现问题先从
-  `openspec/changes/v1-notes-manager/verification.md` 的对应场景查起。
+  `openspec/changes/archive/2026-10-24-v1-notes-manager/verification.md` 的对应场景查起。
 - 预览高亮超过 2 万字符的代码块会退回纯文本；编辑器内代码围栏不着色（由预览承担）。
 - 只有「笔记」一个实体，没有独立代码片段库、没有多窗口、没有快速面板。
+- 批量导入不迁移附件、不解析 Obsidian 扩展语法、不做同步/目录监听；
+  同日批次共用撤销标签（见上一节与 `openspec/changes/archive/2026-10-24-add-markdown-import/design.md`）。
 
 ## 卸载
 

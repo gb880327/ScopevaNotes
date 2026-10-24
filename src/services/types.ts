@@ -75,3 +75,47 @@ export interface ListNotesArgs {
   limit?: number
   cursor?: string
 }
+
+/** Mirrors `import_service::ImportFailure`. */
+export interface ImportFailure {
+  path: string
+  reason: string
+}
+
+/** Mirrors `import_service::ImportPreview` (dry run, nothing written). */
+export interface ImportPreview {
+  root: string
+  totalFiles: number
+  toImport: number
+  skippedExisting: number
+  hiddenSkipped: number
+  localFileRefs: number
+  unreadable: ImportFailure[]
+}
+
+/** Mirrors `import_service::ImportOptions`. */
+export interface ImportOptions {
+  batchSize?: number
+  parentDirTag?: boolean
+}
+
+/** Mirrors `import_service::ImportProgress` (`ui://import-progress`). */
+export interface ImportProgress {
+  done: number
+  total: number
+  imported: number
+}
+
+/** Mirrors `import_service::ImportReport`. */
+export interface ImportReport {
+  imported: number
+  skippedExisting: number
+  failed: ImportFailure[]
+  hiddenSkipped: number
+  decodedAsGb18030: number
+  localFileReferences: number
+  cancelled: boolean
+  elapsedMs: number
+  batchTag: string
+  totalFiles: number
+}
