@@ -1,5 +1,8 @@
 # macOS Notes Manager V1 — 可执行开发实施方案
 
+> **已迁移**：本文件是历史输入。规格与任务以 `openspec/changes/v1-notes-manager/` 为准，
+> 新需求请开新的 OpenSpec change，不要直接修改本文件。
+
 > 版本：1.0 · 2026-10-24  
 > 状态：产品范围和 UI 信息架构已确认；可直接作为 Codex / OpenCode / Pi 的实施输入。  
 > 目标：macOS 本地优先的 Markdown 笔记和代码块管理器，支持菜单栏常驻、快捷键控制、两栏 UI、SQLite 自定义路径及一键复制代码。

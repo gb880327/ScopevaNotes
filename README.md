@@ -2,8 +2,16 @@
 
 macOS local-first Markdown notes + code-snippet manager. Tauri 2 (Rust) + Vue 3 + SQLite.
 
-产品范围与验收标准见 [`docs/macos-notes-manager-v1-implementation-plan.md`](docs/macos-notes-manager-v1-implementation-plan.md)。
-实现取舍见 [`docs/DECISIONS.md`](docs/DECISIONS.md)。
+产品范围与验收标准以 OpenSpec 为准：[`openspec/changes/v1-notes-manager/`](openspec/changes/v1-notes-manager/)（proposal / specs / design / tasks）。
+
+```bash
+openspec status --change v1-notes-manager   # 产物与任务进度
+openspec validate v1-notes-manager --strict # 规格校验
+```
+
+`docs/` 下的文档是设计参考与历史输入，不再作为规格来源：
+[`ARCHITECTURE`](docs/ARCHITECTURE.md)、[`DECISIONS`](docs/DECISIONS.md)、
+[`UI_SPEC`](docs/UI_SPEC.md)、[`TEST_PLAN`](docs/TEST_PLAN.md)、[`POC_FINDINGS`](docs/POC_FINDINGS.md)。
 
 ## 开发
 
