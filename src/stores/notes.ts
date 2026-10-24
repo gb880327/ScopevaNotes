@@ -431,10 +431,12 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
+  // Single-select by design: the sidebar shows one tag filter at a time, so picking
+  // another tag replaces the current one instead of narrowing further. Clicking the
+  // active tag again clears the filter. The command still accepts a list; this is a
+  // UI affordance, not a transport limit.
   function toggleTagFilter(id: string) {
-    activeTagIds.value = activeTagIds.value.includes(id)
-      ? activeTagIds.value.filter((tagId) => tagId !== id)
-      : [...activeTagIds.value, id]
+    activeTagIds.value = activeTagIds.value.includes(id) ? [] : [id]
     void refresh()
   }
 

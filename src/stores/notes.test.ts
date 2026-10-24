@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { useNotesStore, TagAttachError } from './notes'
 import type { NoteDetail, NoteSummary, TagWithCount } from '@/services/types'
@@ -231,6 +232,32 @@ function noteWithTags(tags: NoteDetail['tags']): NoteDetail {
 }
 
 describe('notes store tag management', () => {
+  it('keeps the tag filter to a single tag: picking another replaces it', async () => {
+    const store = useNotesStore()
+    store.tags = [tagWithCount('tag-1', 'db'), tagWithCount('tag-2', 'work')]
+
+    store.toggleTagFilter('tag-1')
+    await flushPromises()
+    expect(store.activeTagIds).toEqual(['tag-1'])
+    expect(listNotes).toHaveBeenLastCalledWith(
+      expect.objectContaining({ tagIds: ['tag-1'] }),
+    )
+
+    store.toggleTagFilter('tag-2')
+    await flushPromises()
+    expect(store.activeTagIds).toEqual(['tag-2'])
+    expect(listNotes).toHaveBeenLastCalledWith(
+      expect.objectContaining({ tagIds: ['tag-2'] }),
+    )
+
+    store.toggleTagFilter('tag-2')
+    await flushPromises()
+    expect(store.activeTagIds).toEqual([])
+    expect(listNotes).toHaveBeenLastCalledWith(
+      expect.objectContaining({ tagIds: undefined }),
+    )
+  })
+
   it('renames the tag in the sidebar and on the open note, then re-queries', async () => {
     const store = useNotesStore()
     store.tags = [tagWithCount('tag-1', 'db', 3)]

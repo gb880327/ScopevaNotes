@@ -67,6 +67,18 @@ describe('TagList rows', () => {
     expect(wrapper.find('[data-testid="confirm-delete-tag"]').exists()).toBe(false)
   })
 
+  it('marks at most one tag as active — the filter is single-select', async () => {
+    const { wrapper, store } = setup()
+
+    await wrapper.findAll('.row .tag')[0].trigger('click')
+    await wrapper.findAll('.row .tag')[1].trigger('click')
+
+    const active = wrapper.findAll('.row .tag').filter((node) => node.classes().includes('active'))
+    expect(active).toHaveLength(1)
+    expect(active[0].find('.name').text()).toBe('work')
+    expect(store.activeTagIds).toEqual(['tag-2'])
+  })
+
   it('shows an empty state instead of a bare list', () => {
     const { wrapper } = setup([])
     expect(wrapper.find('.empty').text()).toBe('还没有标签')

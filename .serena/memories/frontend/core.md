@@ -89,6 +89,9 @@ test mocks `@tauri-apps/plugin-store` with an in-memory map instead of touching 
 - Successful tag writes re-query `list_tags` (`refreshTags()`) instead of optimistic ±1 on counts.
 - Popovers inside the sidebar/`.meta` **must not** be `position: absolute`: `.scroll` (`overflow-y: auto`) and `.meta` (`overflow-x: auto`) clip them to one line. Render them in flow (palette = wrapped second line of the row, NoteHeader picker = sibling below the chip row).
 
+## Tag filter
+- `activeTagIds` is an array on the transport but a **single** value in the UI: `toggleTagFilter(id)` sets `[id]` or `[]`, never appends. Multi-tag filtering is not a product feature (baseline spec `notes-core` says so) — do not "restore" additive selection.
+
 ## Trash UI
 - `stores/notes.ts` keeps `deleted` (list, capped) and `deletedCount` (whole trash, from `count_deleted_notes`). `purgeNote` / `emptyTrash` run the command first, then re-read trash + list + tag counts; they rethrow after setting `error`, so a failure leaves the UI untouched (no optimistic removal on a destructive action).
 - `TrashList.vue` confirmations (per-row purge and clear-trash) are in-flow panels (`flex-basis: 100%` inside a `flex-wrap: wrap` row), never absolute — `.trash` scrolls and would clip a popover. Esc closes them via a `document` keydown listener that is attached/detached by a `watch` and removed in `onUnmounted`.
