@@ -11,6 +11,9 @@
 - [x] 窗口状态机（HIDDEN ↔ VISIBLE）与关闭按钮 → 隐藏的代码路径已接好；
       居中算法有单元测试（含负坐标副屏、超大窗口 clamp）。
 - [x] 打包图标生成（`pnpm tauri icon`）。
+- [x] 运行时冒烟：`pnpm tauri dev` 启动无 panic，进程存活；
+      `~/Library/Application Support/com.scopeva.notes/notes.db` 自动创建，
+      `schema_migrations` 记录 v1/v2，`notes_fts` 虚表存在。
 
 ## 未验证（必须实机执行后才能勾选）
 
@@ -21,6 +24,7 @@
 - [ ] 关闭隐藏后 Dock 行为、⌘Q 与 tray 退出的差异。
 - [ ] 开机启动（LaunchAgent）在目标系统上的实际行为。
 - [ ] `pnpm tauri dev` 首次运行的 WebView 加载与快捷键注册顺序。
+- [ ] 双栏 UI 实际渲染与交互（冒烟仅证明进程启动、迁移落盘，未做视觉/交互确认）。
 - [ ] 白底图标在深色菜单栏下的可见性（需要 template icon）。
 
 ## 已知缺口
