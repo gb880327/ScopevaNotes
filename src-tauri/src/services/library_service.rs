@@ -12,6 +12,10 @@ pub struct LibraryInfo {
     pub path: String,
     pub schema_version: i64,
     pub is_default: bool,
+    /// Visible notes only; the trash is reported separately by the UI.
+    pub note_count: i64,
+    /// Main database file plus its WAL, so the number matches Finder after writes.
+    pub file_size_bytes: i64,
 }
 
 /// Only the library pointer and UI preferences live here — never note data
@@ -75,11 +79,34 @@ pub fn resolve<R: Runtime>(app: &AppHandle<R>) -> AppResult<(Database, LibraryIn
 
 pub fn info_for(db: &Database, is_default: bool) -> AppResult<LibraryInfo> {
     let schema_version = db.with_conn(|conn| migrations::current_version(conn))?;
+    let note_count = db.with_conn(|conn| {
+        conn.query_row(
+            "SELECT COUNT(*) FROM notes WHERE deleted_at IS NULL",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(Into::into)
+    })?;
     Ok(LibraryInfo {
         path: db.path().to_string_lossy().into_owned(),
         schema_version,
         is_default,
+        note_count,
+        file_size_bytes: disk_usage(db.path()),
     })
+}
+
+/// SQLite spreads writes into `-wal` until a checkpoint, so counting the main
+/// file alone under-reports the library by up to a few MB.
+fn disk_usage(path: &std::path::Path) -> i64 {
+    let mut total = std::fs::metadata(path).map(|m| m.len() as i64).unwrap_or(0);
+    for suffix in ["-wal", "-shm"] {
+        let side = std::path::PathBuf::from(format!("{}{suffix}", path.to_string_lossy()));
+        if let Ok(meta) = std::fs::metadata(side) {
+            total += meta.len() as i64;
+        }
+    }
+    total
 }
 
 /// Reject paths that would overwrite an existing file on "create".

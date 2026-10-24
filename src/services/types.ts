@@ -53,6 +53,8 @@ export interface LibraryInfo {
   path: string
   schemaVersion: number
   isDefault: boolean
+  noteCount: number
+  fileSizeBytes: number
 }
 
 export interface ListNotesArgs {

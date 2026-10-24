@@ -1,9 +1,11 @@
 use tauri::{
     image::Image,
-    menu::{Menu, MenuItem, PredefinedMenuItem},
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, Runtime,
 };
+
+use tauri_plugin_autostart::ManagerExt;
 
 use crate::models::{AppError, AppResult};
 use crate::state::AppState;
@@ -23,10 +25,31 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
     let settings = MenuItem::with_id(app, "settings", "设置…", true, Some("CommandOrControl+,"))?;
     let quit = MenuItem::with_id(app, "quit", "退出 Notes", true, Some("CommandOrControl+Q"))?;
     let separator = PredefinedMenuItem::separator(app)?;
+    // Mirrors the real LaunchAgent state instead of a stored preference.
+    let autostart_enabled = app.autolaunch().is_enabled().unwrap_or(false);
+    let autostart = CheckMenuItem::with_id(
+        app,
+        "autostart",
+        "开机启动",
+        true,
+        autostart_enabled,
+        None::<&str>,
+    )?;
+    let autostart_item = autostart.clone();
 
     let menu = Menu::with_items(
         app,
-        &[&toggle, &new_note, &separator, &library, &settings, &separator, &quit],
+        &[
+            &toggle,
+            &new_note,
+            &separator,
+            &autostart,
+            &separator,
+            &library,
+            &settings,
+            &separator,
+            &quit,
+        ],
     )?;
 
     let icon = Image::from_bytes(TRAY_ICON)
@@ -38,7 +61,7 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
         .tooltip("Notes")
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id().as_ref() {
+        .on_menu_event(move |app, event| match event.id().as_ref() {
             "toggle" => click_toggle(app),
             "new_note" => {
                 let _ = app.emit("ui://new-note", ());
@@ -51,6 +74,21 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
             "settings" => {
                 let _ = app.emit("ui://open-settings", ());
                 click_toggle(app);
+            }
+            "autostart" => {
+                let manager = app.autolaunch();
+                let enabled = manager.is_enabled().unwrap_or(false);
+                let result = if enabled {
+                    manager.disable()
+                } else {
+                    manager.enable()
+                };
+                if let Err(err) = result {
+                    eprintln!("[autostart] toggle failed: {err}");
+                }
+                // Trust the system after the call, not the click.
+                let actual = manager.is_enabled().unwrap_or(!enabled);
+                let _ = autostart_item.set_checked(actual);
             }
             // Same path as ⌘Q: the frontend flushes, then asks for confirmation.
             "quit" => {

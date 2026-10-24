@@ -52,9 +52,9 @@ src-tauri/
 ## 当前状态
 
 已完成可运行骨架：数据库迁移 + notes/tags CRUD + 软删除/恢复 + FTS 投影维护、
-双栏 UI + CodeMirror 编辑 + Markdown 预览 + 代码块复制 + 自动保存、菜单栏 logo、
-可自定义全局快捷键（默认 ⇧⌘D）、启动静默、退出确认（先 flush 再确认）、关闭即隐藏、
-窗口居中/置顶/尺寸记忆、笔记库打开/新建/迁移/备份。
+双栏 UI + CodeMirror 编辑 + Markdown 预览 + 代码块复制 + 自动保存、回收站与恢复、
+保存冲突处理（重载 / 覆盖）、菜单栏 logo、可自定义全局快捷键（默认 ⇧⌘D）、
+启动静默、退出确认（先 flush 再确认）、关闭即隐藏、窗口居中/置顶/尺寸记忆、
+笔记库打开/新建/迁移/备份与占用统计、开机启动开关。
 
-未完成：FTS 搜索（当前为 LIKE 子串）、Shiki 高亮、回收站视图、开机启动开关、签名分发、
-macOS 实机交互验收。剩余工作见 `openspec/changes/v1-notes-manager/tasks.md` 未勾选项。
+未完成：FTS 搜索（当前为 LIKE 子串）、Shiki 高亮、签名分发、macOS 实机交互验收。剩余工作见 `openspec/changes/v1-notes-manager/tasks.md` 未勾选项。

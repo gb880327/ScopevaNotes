@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog'
 import { api, errorMessage, isDesktop } from '@/services/commands'
 import type { LibraryInfo } from '@/services/types'
+import { formatBytes } from '@/services/format'
 import { useNotesStore } from '@/stores/notes'
 
 const notes = useNotesStore()
@@ -77,6 +78,12 @@ onMounted(refresh)
     <p class="path">
       <span class="label">Schema</span>
       <code>v{{ info?.schemaVersion ?? '—' }}{{ info?.isDefault ? ' · 默认位置' : '' }}</code>
+    </p>
+    <p class="path">
+      <span class="label">占用</span>
+      <code>
+        {{ info ? `${info.noteCount} 条笔记 · ${formatBytes(info.fileSizeBytes)}` : '—' }}
+      </code>
     </p>
 
     <div class="actions">

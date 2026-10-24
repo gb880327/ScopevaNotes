@@ -5,6 +5,7 @@ import type {
   LibraryInfo,
   ListNotesArgs,
   NoteDetail,
+  NoteSummary,
   NoteSummaryPage,
   Tag,
   TagWithCount,
@@ -46,6 +47,8 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
 
 export const api = {
   listNotes: (args: ListNotesArgs = {}) => call<NoteSummaryPage>('list_notes', { ...args }),
+  listDeletedNotes: (limit?: number) =>
+    call<NoteSummary[]>('list_deleted_notes', { limit }),
   getNote: (id: string) => call<NoteDetail>('get_note', { id }),
   createNote: (args: { title?: string; content?: string; tagIds?: string[] } = {}) =>
     call<NoteDetail>('create_note', args),
@@ -55,6 +58,7 @@ export const api = {
     content: string
     tagIds?: string[]
     expectedUpdatedAt: number
+    force?: boolean
   }) => call<NoteDetail>('update_note', args),
   setNoteFavorite: (id: string, value: boolean) =>
     call<void>('set_note_favorite', { id, value }),

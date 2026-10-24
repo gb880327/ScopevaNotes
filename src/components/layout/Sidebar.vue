@@ -2,6 +2,7 @@
 import { useNotesStore } from '@/stores/notes'
 import SearchInput from '@/features/search/SearchInput.vue'
 import NoteList from '@/features/notes/NoteList.vue'
+import TrashList from '@/features/notes/TrashList.vue'
 import TagList from '@/features/tags/TagList.vue'
 
 const notes = useNotesStore()
@@ -21,7 +22,7 @@ const notes = useNotesStore()
         type="button"
         class="chip"
         :class="{ active: !notes.favoritesOnly && !notes.activeTagIds.length }"
-        @click="notes.clearFilters()"
+        @click="notes.closeTrash(); notes.clearFilters()"
       >
         全部
       </button>
@@ -29,13 +30,22 @@ const notes = useNotesStore()
         type="button"
         class="chip"
         :class="{ active: notes.favoritesOnly }"
-        @click="notes.favoritesOnly = !notes.favoritesOnly; notes.refresh()"
+        @click="notes.favoritesOnly = !notes.favoritesOnly; notes.closeTrash(); notes.refresh()"
       >
         收藏
       </button>
+      <button
+        type="button"
+        class="chip"
+        :class="{ active: notes.trashOpen }"
+        @click="notes.trashOpen ? notes.closeTrash() : notes.openTrash()"
+      >
+        回收站
+      </button>
     </div>
 
-    <NoteList />
+    <TrashList v-if="notes.trashOpen" />
+    <NoteList v-else />
     <TagList />
   </aside>
 </template>

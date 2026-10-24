@@ -65,7 +65,7 @@ fn crud_soft_delete_restore_and_search_projection() {
             "Stale title",
             "stale",
             &[],
-            note.updated_at - 1,
+            Some(note.updated_at - 1),
         )
     });
     assert!(matches!(stale, Err(AppError::Conflict(_))));
@@ -78,11 +78,26 @@ fn crud_soft_delete_restore_and_search_projection() {
                 "Fresh title",
                 "fresh body",
                 &[tag.id.clone()],
-                note.updated_at,
+                Some(note.updated_at),
             )
         })
         .expect("update note");
     assert_eq!(updated.title, "Fresh title");
+
+    // "Keep mine and overwrite" skips the token but keeps the same write path.
+    let forced = db
+        .with_conn(|conn| {
+            note_repo::update(
+                conn,
+                &note.id,
+                "Forced title",
+                "forced body",
+                &[tag.id.clone()],
+                None,
+            )
+        })
+        .expect("forced update");
+    assert_eq!(forced.title, "Forced title");
 
     let indexed: i64 = db
         .with_conn(|conn| {
@@ -102,6 +117,14 @@ fn crud_soft_delete_restore_and_search_projection() {
         .with_conn(|conn| note_repo::list(conn, &ListQuery::default()))
         .unwrap();
     assert!(after_delete.items.is_empty());
+
+    // Trash listing is the only entry point `restore` can be reached from.
+    let trash = db
+        .with_conn(|conn| note_repo::list_deleted(conn, None))
+        .expect("list deleted notes");
+    assert_eq!(trash.len(), 1);
+    assert_eq!(trash[0].id, note.id);
+    assert_eq!(trash[0].tags, vec!["rust tips".to_string()]);
     let indexed: i64 = db
         .with_conn(|conn| {
             conn.query_row(
@@ -120,6 +143,10 @@ fn crud_soft_delete_restore_and_search_projection() {
         .with_conn(|conn| note_repo::list(conn, &ListQuery::default()))
         .unwrap();
     assert_eq!(after_restore.items.len(), 1);
+    let trash = db
+        .with_conn(|conn| note_repo::list_deleted(conn, None))
+        .unwrap();
+    assert!(trash.is_empty(), "restored note must leave the trash");
 
     drop(db);
     let _ = std::fs::remove_file(path);

@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { api, errorMessage } from '@/services/commands'
+import { api, CommandError, errorMessage } from '@/services/commands'
 import type { NoteDetail, NoteSummary, TagWithCount } from '@/services/types'
 import { createAutosaveQueue } from '@/composables/useAutosave'
 
-export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'conflict'
 
 function summarize(note: NoteDetail): NoteSummary {
   return {
@@ -28,6 +28,10 @@ export const useNotesStore = defineStore('notes', () => {
   const error = ref<string | null>(null)
   const saveStatus = ref<SaveStatus>('idle')
   const nextCursor = ref<string | null>(null)
+  const deleted = ref<NoteSummary[]>([])
+  const trashOpen = ref(false)
+  /** Non-null while the on-disk row is newer than what the editor holds. */
+  const conflictNoteId = ref<string | null>(null)
 
   // Bumped on every local keystroke; a save response may only overwrite the
   // buffer when it still matches (plan §5 optimistic concurrency).
@@ -79,10 +83,37 @@ export const useNotesStore = defineStore('notes', () => {
 
   async function selectNote(id: string) {
     await queue.flush()
+    conflictNoteId.value = null
     error.value = null
     try {
       selected.value = await api.getNote(id)
       saveStatus.value = 'idle'
+    } catch (err) {
+      error.value = errorMessage(err)
+    }
+  }
+
+  async function openTrash() {
+    trashOpen.value = true
+    error.value = null
+    try {
+      deleted.value = await api.listDeletedNotes()
+    } catch (err) {
+      error.value = errorMessage(err)
+    }
+  }
+
+  function closeTrash() {
+    trashOpen.value = false
+    deleted.value = []
+  }
+
+  async function restoreNote(id: string) {
+    try {
+      await api.restoreNote(id)
+      deleted.value = deleted.value.filter((item) => item.id !== id)
+      await refresh()
+      await refreshTags()
     } catch (err) {
       error.value = errorMessage(err)
     }
@@ -143,9 +174,53 @@ export const useNotesStore = defineStore('notes', () => {
       saveStatus.value = 'saved'
       error.value = null
     } catch (err) {
+      if (err instanceof CommandError && err.kind === 'conflict') {
+        // Keep the editor buffer; the user picks reload or overwrite.
+        saveStatus.value = 'conflict'
+        conflictNoteId.value = note.id
+        error.value = null
+        return
+      }
       saveStatus.value = 'error'
       error.value = errorMessage(err)
       throw err
+    }
+  }
+
+  async function resolveConflictReload() {
+    const id = conflictNoteId.value
+    if (!id) return
+    queue.discard()
+    try {
+      selected.value = await api.getNote(id)
+      conflictNoteId.value = null
+      saveStatus.value = 'idle'
+      await refresh()
+    } catch (err) {
+      error.value = errorMessage(err)
+    }
+  }
+
+  async function resolveConflictOverwrite() {
+    const note = selected.value
+    if (!note) return
+    queue.discard()
+    try {
+      const saved = await api.updateNote({
+        id: note.id,
+        title: note.title,
+        content: note.content,
+        tagIds: note.tags.map((tag) => tag.id),
+        expectedUpdatedAt: note.updatedAt,
+        force: true,
+      })
+      selected.value = saved
+      conflictNoteId.value = null
+      saveStatus.value = 'saved'
+      const index = items.value.findIndex((item) => item.id === saved.id)
+      if (index >= 0) items.value[index] = summarize(saved)
+    } catch (err) {
+      error.value = errorMessage(err)
     }
   }
 
@@ -218,7 +293,15 @@ export const useNotesStore = defineStore('notes', () => {
     error,
     saveStatus,
     nextCursor,
+    deleted,
+    trashOpen,
+    conflictNoteId,
     refresh,
+    openTrash,
+    resolveConflictReload,
+    resolveConflictOverwrite,
+    closeTrash,
+    restoreNote,
     loadMore,
     refreshTags,
     selectNote,

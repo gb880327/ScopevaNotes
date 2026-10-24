@@ -2,6 +2,7 @@
 import { useUiStore } from '@/stores/ui'
 import AppearanceSettings from './AppearanceSettings.vue'
 import ShortcutSettings from './ShortcutSettings.vue'
+import StartupSettings from './StartupSettings.vue'
 import LibrarySettings from './LibrarySettings.vue'
 
 const ui = useUiStore()
@@ -18,6 +19,8 @@ const ui = useUiStore()
         <AppearanceSettings />
         <hr />
         <ShortcutSettings />
+        <hr />
+        <StartupSettings />
         <hr />
         <LibrarySettings />
       </div>

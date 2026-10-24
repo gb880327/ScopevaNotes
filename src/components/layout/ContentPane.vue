@@ -21,6 +21,8 @@ const statusText = computed(() => {
       return '保存中…'
     case 'saved':
       return '已保存'
+    case 'conflict':
+      return '未保存 · 版本冲突'
     case 'error':
       return '未保存 · 将重试'
     default:
@@ -34,6 +36,16 @@ const statusText = computed(() => {
     <p v-if="notes.error" class="banner">
       {{ notes.error }}
       <button type="button" @click="notes.error = null">×</button>
+    </p>
+
+    <p v-if="notes.conflictNoteId" class="banner conflict">
+      这条笔记在别处被修改了，本地改动尚未保存。
+      <button type="button" class="action" @click="notes.resolveConflictReload()">
+        重新载入
+      </button>
+      <button type="button" class="action" @click="notes.resolveConflictOverwrite()">
+        保留本地并覆盖
+      </button>
     </p>
 
     <template v-if="notes.selected">
@@ -114,8 +126,26 @@ footer {
   color: var(--text-muted);
 }
 
-.status.error {
+.status.error,
+.status.conflict {
   color: var(--danger);
+}
+.banner.conflict {
+  border-color: var(--accent);
+  color: var(--text);
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.banner .action {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.banner .action:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
 .empty {

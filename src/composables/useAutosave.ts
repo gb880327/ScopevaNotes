@@ -8,6 +8,8 @@
 export interface AutosaveQueue {
   schedule: () => void
   flush: () => Promise<void>
+  /** Drop pending work without saving (conflict reload discards local edits). */
+  discard: () => void
   isDirty: () => boolean
 }
 
@@ -43,5 +45,10 @@ export function createAutosaveQueue(run: () => Promise<void>, delay = 600): Auto
     timer = setTimeout(() => void flush(), delay)
   }
 
-  return { schedule, flush, isDirty: () => dirty }
+  const discard = () => {
+    clearTimer()
+    dirty = false
+  }
+
+  return { schedule, flush, discard, isDirty: () => dirty }
 }

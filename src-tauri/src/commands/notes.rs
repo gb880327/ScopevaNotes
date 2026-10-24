@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::commands::blocking;
-use crate::models::{AppResult, NoteDetail, NoteSummaryPage};
+use crate::models::{AppResult, NoteDetail, NoteSummary, NoteSummaryPage};
 use crate::repositories::note_repo::{self, Cursor, ListQuery};
 use crate::state::AppState;
 
@@ -23,6 +23,16 @@ pub async fn list_notes(
         cursor: cursor.as_deref().map(Cursor::decode).transpose()?,
     };
     blocking(move || db.with_conn(|conn| note_repo::list(conn, &query))).await
+}
+
+/// Trash view: what `soft_delete_note` removed, so `restore_note` has an entry.
+#[tauri::command]
+pub async fn list_deleted_notes(
+    state: State<'_, AppState>,
+    limit: Option<i64>,
+) -> AppResult<Vec<NoteSummary>> {
+    let db = state.db();
+    blocking(move || db.with_conn(|conn| note_repo::list_deleted(conn, limit))).await
 }
 
 #[tauri::command]
@@ -60,6 +70,8 @@ pub async fn update_note(
     content: String,
     tag_ids: Option<Vec<String>>,
     expected_updated_at: i64,
+    // Set after the user resolved a conflict with "keep local and overwrite".
+    force: Option<bool>,
 ) -> AppResult<NoteDetail> {
     let db = state.db();
     blocking(move || {
@@ -70,7 +82,11 @@ pub async fn update_note(
                 &title,
                 &content,
                 &tag_ids.unwrap_or_default(),
-                expected_updated_at,
+                if force.unwrap_or(false) {
+                    None
+                } else {
+                    Some(expected_updated_at)
+                },
             )
         })
     })

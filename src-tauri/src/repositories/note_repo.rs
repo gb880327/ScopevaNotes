@@ -41,6 +41,47 @@ pub struct ListQuery {
     pub cursor: Option<Cursor>,
 }
 
+/// Trash listing: soft-deleted notes only, newest deletion first. Not paginated
+/// — the trash is expected to stay small and the UI restores instead of browsing.
+pub fn list_deleted(conn: &Connection, limit: Option<i64>) -> AppResult<Vec<NoteSummary>> {
+    let limit = limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
+    let mut stmt = conn.prepare(
+        "SELECT n.id, n.title, substr(n.content, 1, 240), n.updated_at, n.is_favorite
+         FROM notes n
+         WHERE n.deleted_at IS NOT NULL
+         ORDER BY n.deleted_at DESC, n.id DESC
+         LIMIT ?1",
+    )?;
+    let rows = stmt.query_map([limit], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, i64>(3)?,
+            row.get::<_, i64>(4)?,
+        ))
+    })?;
+
+    let mut raw = Vec::new();
+    for row in rows {
+        raw.push(row?);
+    }
+    let ids: Vec<String> = raw.iter().map(|(id, ..)| id.clone()).collect();
+    let mut tags = tags_for_notes(conn, &ids)?;
+
+    Ok(raw
+        .into_iter()
+        .map(|(id, title, content, updated_at, is_favorite)| NoteSummary {
+            tags: tags.remove(&id).unwrap_or_default(),
+            excerpt: excerpt(&content),
+            id,
+            title,
+            updated_at,
+            is_favorite: is_favorite != 0,
+        })
+        .collect())
+}
+
 pub fn list(conn: &Connection, query: &ListQuery) -> AppResult<NoteSummaryPage> {
     let limit = query.limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
     let mut sql = String::from(
@@ -184,7 +225,9 @@ pub fn update(
     title: &str,
     content: &str,
     tag_ids: &[String],
-    expected_updated_at: i64,
+    // `None` forces the write (user chose "keep mine"); `Some` is the
+    // optimistic-concurrency token and must match the stored row.
+    expected_updated_at: Option<i64>,
 ) -> AppResult<NoteDetail> {
     let tx = conn.transaction()?;
     let current: Option<i64> = tx
@@ -195,10 +238,12 @@ pub fn update(
     let Some(current) = current else {
         return Err(AppError::NotFound(format!("note {id}")));
     };
-    if current != expected_updated_at {
-        return Err(AppError::Conflict(
-            "note changed in another window; reload before saving".into(),
-        ));
+    if let Some(expected) = expected_updated_at {
+        if current != expected {
+            return Err(AppError::Conflict(
+                "note changed in another window; reload before saving".into(),
+            ));
+        }
     }
 
     tx.execute(
