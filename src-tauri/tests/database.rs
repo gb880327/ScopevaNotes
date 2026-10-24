@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use macos_notes_lib::database::Database;
@@ -7,11 +8,16 @@ use macos_notes_lib::repositories::note_repo::{self, ListQuery};
 use macos_notes_lib::repositories::tag_repo;
 
 fn temp_db() -> (Database, PathBuf) {
+    // The clock alone is not enough: macOS resolves it to microseconds, so two
+    // tests starting in the same tick would share one file and fight over
+    // `schema_migrations`.
+    static SEQ: AtomicU64 = AtomicU64::new(0);
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let path = std::env::temp_dir().join(format!("macos-notes-test-{unique}.db"));
+    let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+    let path = std::env::temp_dir().join(format!("macos-notes-test-{unique}-{seq}.db"));
     let db = Database::open(&path).expect("open temp database");
     (db, path)
 }
@@ -468,6 +474,139 @@ fn upgrade_from_v3_preserves_notes_and_adds_import_columns() {
         Ok(())
     })
     .expect("unique source_path");
+
+    drop(db);
+    let _ = std::fs::remove_file(&path);
+}
+
+/// Counts a note id across every table permanent deletion must clean up.
+fn rows_for(db: &Database, id: &str) -> (i64, i64, i64) {
+    db.with_conn(|conn| {
+        let notes: i64 = conn.query_row("SELECT count(*) FROM notes WHERE id = ?1", [id], |r| {
+            r.get(0)
+        })?;
+        let links: i64 =
+            conn.query_row("SELECT count(*) FROM note_tags WHERE note_id = ?1", [id], |r| {
+                r.get(0)
+            })?;
+        let fts: i64 =
+            conn.query_row("SELECT count(*) FROM notes_fts WHERE note_id = ?1", [id], |r| {
+                r.get(0)
+            })?;
+        Ok((notes, links, fts))
+    })
+    .expect("count rows")
+}
+
+#[test]
+fn purge_removes_the_note_body_links_and_search_row() {
+    let (db, path) = temp_db();
+    let tag = db
+        .with_conn(|conn| tag_repo::create(conn, "work", None))
+        .expect("create tag");
+    let id = seed(&db, "投放清单", "只有这一段正文", &[tag.id.clone()]);
+    assert_eq!(rows_for(&db, &id), (1, 1, 1));
+    assert_eq!(search(&db, "投放清单"), vec!["投放清单".to_string()]);
+
+    // A live note is not purgeable: "permanently delete" must not bypass the trash.
+    let rejected = db.with_conn(|conn| note_repo::purge(conn, &id));
+    assert!(matches!(rejected, Err(AppError::NotFound(_))), "{rejected:?}");
+    assert_eq!(rows_for(&db, &id), (1, 1, 1), "a rejected purge changes nothing");
+    assert_eq!(search(&db, "投放清单").len(), 1);
+
+    db.with_conn(|conn| note_repo::soft_delete(conn, &id))
+        .expect("soft delete");
+    assert_eq!(rows_for(&db, &id), (1, 1, 0), "trashing drops the search row");
+
+    db.with_conn(|conn| note_repo::purge(conn, &id))
+        .expect("purge");
+    assert_eq!(rows_for(&db, &id), (0, 0, 0), "notes / note_tags / notes_fts");
+    assert_eq!(search(&db, "投放清单"), Vec::<String>::new());
+
+    let again = db.with_conn(|conn| note_repo::purge(conn, &id));
+    assert!(matches!(again, Err(AppError::NotFound(_))), "{again:?}");
+
+    drop(db);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn empty_trash_keeps_live_notes_and_their_deletion_timestamps_are_real() {
+    let (db, path) = temp_db();
+    let tag = db
+        .with_conn(|conn| tag_repo::create(conn, "work", None))
+        .expect("create tag");
+
+    let doomed: Vec<String> = ["废稿一", "废稿二", "废稿三"]
+        .iter()
+        .map(|title| seed(&db, title, "销毁前正文", &[tag.id.clone()]))
+        .collect();
+    let kept: Vec<String> = ["留着一", "留着二"]
+        .iter()
+        .map(|title| seed(&db, title, "保留正文", &[tag.id.clone()]))
+        .collect();
+    for id in &doomed {
+        db.with_conn(|conn| note_repo::soft_delete(conn, id))
+            .expect("soft delete");
+    }
+
+    let kept_before: Vec<(i64, String)> = kept
+        .iter()
+        .map(|id| {
+            let note = db.with_conn(|conn| note_repo::get(conn, id)).expect("get kept");
+            (note.updated_at, note.content)
+        })
+        .collect();
+
+    // `deleted_at` is the deletion moment, not `updated_at` living a double life.
+    let listed = db
+        .with_conn(|conn| note_repo::list_deleted(conn, None))
+        .expect("list deleted");
+    assert_eq!(listed.len(), 3);
+    let marked: Vec<i64> = listed.iter().map(|n| n.deleted_at.expect("deletedAt")).collect();
+    assert!(marked.iter().all(|ts| *ts > 0));
+    let live = db
+        .with_conn(|conn| {
+            note_repo::list(
+                conn,
+                &ListQuery {
+                    limit: Some(10),
+                    ..Default::default()
+                },
+            )
+        })
+        .expect("list live")
+        .items;
+    assert!(
+        live.iter().all(|n| n.deleted_at.is_none()),
+        "the live listing leaves deletedAt empty"
+    );
+
+    assert_eq!(db.with_conn(|conn| note_repo::count_deleted(conn)).expect("count"), 3);
+    let removed = db
+        .with_conn(|conn| note_repo::purge_all(conn))
+        .expect("empty trash");
+    assert_eq!(removed, 3);
+    assert_eq!(db.with_conn(|conn| note_repo::count_deleted(conn)).expect("count"), 0);
+    assert!(db
+        .with_conn(|conn| note_repo::list_deleted(conn, None))
+        .expect("list deleted")
+        .is_empty());
+
+    for id in &doomed {
+        assert_eq!(rows_for(&db, id), (0, 0, 0));
+    }
+    for (id, before) in kept.iter().zip(kept_before) {
+        assert_eq!(rows_for(&db, id), (1, 1, 1), "live note untouched");
+        let note = db.with_conn(|conn| note_repo::get(conn, id)).expect("get kept");
+        assert_eq!((note.updated_at, note.content.clone()), before);
+        assert_eq!(
+            note.tags.iter().map(|tag| tag.name.as_str()).collect::<Vec<_>>(),
+            vec!["work"]
+        );
+    }
+    assert_eq!(search(&db, "保留正文").len(), 2);
+    assert_eq!(search(&db, "销毁前正文"), Vec::<String>::new());
 
     drop(db);
     let _ = std::fs::remove_file(&path);

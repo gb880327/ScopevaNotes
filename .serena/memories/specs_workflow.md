@@ -1,9 +1,10 @@
 # OpenSpec workflow (acceptance baseline)
 
 - **`openspec/specs/` is the living baseline** (8 capabilities: `notes-core`, `search`, `library`,
-  `markdown-editing`, `markdown-import`, `macos-shell`, `appearance`, `release-readiness`). Three changes were
+  `markdown-editing`, `markdown-import`, `macos-shell`, `appearance`, `release-readiness`). Four changes were
   archived into it: `v1-notes-manager` (70/70), `add-markdown-import` (24/26, two manual verification tasks left
-  open on purpose) and `add-tag-management` (19/19, closed after the user ran the manual pass). History, decision
+  open on purpose), `add-tag-management` (19/19) and `add-trash-purge` (17/17) — the last two closed after the
+  user ran their manual pass on the real machine. No change is active right now. History, decision
   logs and `verification.md` stay readable under `openspec/changes/archive/<date>-<name>/`.
 - New work starts as a change again: `openspec new change <name>` -> proposal / delta specs / design / tasks,
   `openspec validate <name> --strict` after **every** artifact edit, `openspec archive <name> -y` at the end

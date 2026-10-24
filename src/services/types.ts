@@ -32,6 +32,8 @@ export interface NoteSummary {
   updatedAt: number
   isFavorite: boolean
   tags: string[]
+  /** Set only for trash rows: when the note was deleted, not when it was edited. */
+  deletedAt: number | null
 }
 
 export interface NoteSummaryPage {

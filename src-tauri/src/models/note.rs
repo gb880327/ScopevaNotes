@@ -12,6 +12,9 @@ pub struct NoteSummary {
     pub updated_at: i64,
     pub is_favorite: bool,
     pub tags: Vec<String>,
+    /// `Some` only for rows coming from the trash, so the recycle bin can show
+    /// *when* a note was deleted instead of reusing `updated_at` (design D5).
+    pub deleted_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

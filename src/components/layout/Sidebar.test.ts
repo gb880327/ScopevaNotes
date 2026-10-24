@@ -8,6 +8,7 @@ import type { NoteSummary, TagWithCount } from '@/services/types'
 const listNotes = vi.fn(async () => ({ items: [] as NoteSummary[], nextCursor: null }))
 const listDeleted = vi.fn(async () => [] as NoteSummary[])
 const listTags = vi.fn(async () => [] as TagWithCount[])
+const countDeleted = vi.fn(async () => 0)
 
 vi.mock('@/services/commands', () => ({
   isDesktop: false,
@@ -16,6 +17,9 @@ vi.mock('@/services/commands', () => ({
   api: {
     listNotes: (...args: unknown[]) => listNotes(...(args as [])),
     listDeletedNotes: (...args: unknown[]) => listDeleted(...(args as [])),
+    countDeletedNotes: (...args: unknown[]) => countDeleted(...(args as [])),
+    purgeNote: async () => {},
+    emptyTrash: async () => 0,
     listTags: (...args: unknown[]) => listTags(...(args as [])),
     getGlobalShortcut: async () => 'CommandOrControl+Shift+D',
     getLibraryInfo: async () => ({ path: '/tmp/notes.db', isDefault: true, noteCount: 0, fileSizeBytes: 0, notice: null }),
@@ -35,6 +39,7 @@ function summary(index: number, overrides: Partial<NoteSummary> = {}): NoteSumma
     updatedAt: 1_700_000_000_000 + index,
     isFavorite: false,
     tags: [],
+    deletedAt: null,
     ...overrides,
   }
 }
@@ -79,7 +84,8 @@ describe('Sidebar filters', () => {
 
   it('swaps the note list for the trash view and back', async () => {
     const notes = useNotesStore()
-    listDeleted.mockResolvedValueOnce([summary(9, { title: '已删除的笔记' })])
+    listDeleted.mockResolvedValueOnce([summary(9, { title: '已删除的笔记', deletedAt: 1_700_000_100_000 })])
+    countDeleted.mockResolvedValueOnce(1)
     const wrapper = mountSidebar()
 
     await wrapper.findAll('.chip')[2].trigger('click')
@@ -101,7 +107,7 @@ describe('Sidebar filters', () => {
     notes.trashOpen = true
     const wrapper = mountSidebar()
 
-    expect(wrapper.text()).toContain('回收站是空的')
+    expect(wrapper.text()).toContain('垃圾箱是空的')
   })
 })
 

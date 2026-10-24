@@ -46,7 +46,7 @@ pub struct ListQuery {
 pub fn list_deleted(conn: &Connection, limit: Option<i64>) -> AppResult<Vec<NoteSummary>> {
     let limit = limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
     let mut stmt = conn.prepare(
-        "SELECT n.id, n.title, substr(n.content, 1, 240), n.updated_at, n.is_favorite
+        "SELECT n.id, n.title, substr(n.content, 1, 240), n.updated_at, n.is_favorite, n.deleted_at
          FROM notes n
          WHERE n.deleted_at IS NOT NULL
          ORDER BY n.deleted_at DESC, n.id DESC
@@ -59,6 +59,7 @@ pub fn list_deleted(conn: &Connection, limit: Option<i64>) -> AppResult<Vec<Note
             row.get::<_, String>(2)?,
             row.get::<_, i64>(3)?,
             row.get::<_, i64>(4)?,
+            row.get::<_, Option<i64>>(5)?,
         ))
     })?;
 
@@ -71,13 +72,14 @@ pub fn list_deleted(conn: &Connection, limit: Option<i64>) -> AppResult<Vec<Note
 
     Ok(raw
         .into_iter()
-        .map(|(id, title, content, updated_at, is_favorite)| NoteSummary {
+        .map(|(id, title, content, updated_at, is_favorite, deleted_at)| NoteSummary {
             tags: tags.remove(&id).unwrap_or_default(),
             excerpt: excerpt(&content),
             id,
             title,
             updated_at,
             is_favorite: is_favorite != 0,
+            deleted_at,
         })
         .collect())
 }
@@ -188,6 +190,7 @@ pub fn list(conn: &Connection, query: &ListQuery) -> AppResult<NoteSummaryPage> 
             title,
             updated_at,
             is_favorite: is_favorite != 0,
+            deleted_at: None,
         })
         .collect();
 
@@ -376,6 +379,58 @@ pub fn restore(conn: &mut Connection, id: &str) -> AppResult<()> {
     search_index::reindex_note(&tx, id)?;
     tx.commit()?;
     Ok(())
+}
+
+/// How many notes sit in the trash right now. The clear-trash button labels
+/// itself with this number: the listing is capped by `limit`, the action is not.
+pub fn count_deleted(conn: &Connection) -> AppResult<i64> {
+    let count = conn.query_row(
+        "SELECT count(*) FROM notes WHERE deleted_at IS NOT NULL",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(count)
+}
+
+/// Permanent deletion of one trashed note (design D1/D2). Only rows already in
+/// the trash can be purged, so "permanently delete" can never bypass the
+/// recycle bin; anything else is `NotFound`.
+///
+/// Order matters: `notes_fts` has no foreign key and its `note_id` column is
+/// UNINDEXED, so the index row has to be removed while the note row still
+/// exists, and in a single statement rather than a per-note loop.
+pub fn purge(conn: &mut Connection, id: &str) -> AppResult<()> {
+    let tx = conn.transaction()?;
+    tx.execute(
+        "DELETE FROM notes_fts WHERE note_id IN
+           (SELECT id FROM notes WHERE id = ?1 AND deleted_at IS NOT NULL)",
+        [id],
+    )?;
+    let removed = tx.execute(
+        "DELETE FROM notes WHERE id = ?1 AND deleted_at IS NOT NULL",
+        [id],
+    )?;
+    if removed == 0 {
+        // Dropping `tx` without committing rolls the FTS delete back too.
+        return Err(AppError::NotFound(format!("deleted note {id}")));
+    }
+    tx.commit()?;
+    Ok(())
+}
+
+/// Empty the trash. One statement per table, so 10k deleted notes cost two full
+/// scans instead of 10k reindex calls (design D2); tag rows go with the note via
+/// `ON DELETE CASCADE`.
+pub fn purge_all(conn: &mut Connection) -> AppResult<usize> {
+    let tx = conn.transaction()?;
+    tx.execute(
+        "DELETE FROM notes_fts WHERE note_id IN
+           (SELECT id FROM notes WHERE deleted_at IS NOT NULL)",
+        [],
+    )?;
+    let removed = tx.execute("DELETE FROM notes WHERE deleted_at IS NOT NULL", [])?;
+    tx.commit()?;
+    Ok(removed)
 }
 
 /// Undo one import batch: everything carrying the batch tag goes to the trash

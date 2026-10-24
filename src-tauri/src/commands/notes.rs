@@ -114,3 +114,25 @@ pub async fn restore_note(state: State<'_, AppState>, id: String) -> AppResult<(
     let db = state.db();
     blocking(move || db.with_conn(|conn| note_repo::restore(conn, &id))).await
 }
+
+/// Trash size for the "empty trash (N)" label; independent of the listing cap.
+#[tauri::command]
+pub async fn count_deleted_notes(state: State<'_, AppState>) -> AppResult<i64> {
+    let db = state.db();
+    blocking(move || db.with_conn(|conn| note_repo::count_deleted(conn))).await
+}
+
+/// Permanent delete of a single trashed note. Not offered for live notes: the
+/// repository rejects them with `NotFound`.
+#[tauri::command]
+pub async fn purge_note(state: State<'_, AppState>, id: String) -> AppResult<()> {
+    let db = state.db();
+    blocking(move || db.with_conn(|conn| note_repo::purge(conn, &id))).await
+}
+
+/// Empty the trash; returns how many notes were destroyed.
+#[tauri::command]
+pub async fn empty_trash(state: State<'_, AppState>) -> AppResult<usize> {
+    let db = state.db();
+    blocking(move || db.with_conn(|conn| note_repo::purge_all(conn))).await
+}

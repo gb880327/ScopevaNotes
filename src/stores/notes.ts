@@ -28,6 +28,7 @@ function summarize(note: NoteDetail): NoteSummary {
     updatedAt: note.updatedAt,
     isFavorite: note.isFavorite,
     tags: note.tags.map((tag) => tag.name),
+    deletedAt: note.deletedAt,
   }
 }
 
@@ -43,6 +44,8 @@ export const useNotesStore = defineStore('notes', () => {
   const saveStatus = ref<SaveStatus>('idle')
   const nextCursor = ref<string | null>(null)
   const deleted = ref<NoteSummary[]>([])
+  /** Whole-trash size, not `deleted.length`: the listing is capped by `limit`. */
+  const deletedCount = ref(0)
   const trashOpen = ref(false)
   /** Non-null while the on-disk row is newer than what the editor holds. */
   const conflictNoteId = ref<string | null>(null)
@@ -118,11 +121,20 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
+  async function refreshTrash() {
+    const [items, count] = await Promise.all([
+      api.listDeletedNotes(),
+      api.countDeletedNotes(),
+    ])
+    deleted.value = items
+    deletedCount.value = count
+  }
+
   async function openTrash() {
     trashOpen.value = true
     error.value = null
     try {
-      deleted.value = await api.listDeletedNotes()
+      await refreshTrash()
     } catch (err) {
       error.value = errorMessage(err)
     }
@@ -131,6 +143,39 @@ export const useNotesStore = defineStore('notes', () => {
   function closeTrash() {
     trashOpen.value = false
     deleted.value = []
+    deletedCount.value = 0
+  }
+
+  /**
+   * Permanent deletes are the only path that destroys data, so they never touch
+   * `selected` optimistically: the command runs first and the trash is re-read
+   * afterwards. A failure leaves both lists as they were and surfaces `error`.
+   */
+  async function purgeNote(id: string) {
+    error.value = null
+    try {
+      await api.purgeNote(id)
+      await refreshTrash()
+      await refresh()
+      await refreshTags()
+      if (selected.value?.id === id) selected.value = null
+    } catch (err) {
+      error.value = errorMessage(err)
+      throw err
+    }
+  }
+
+  async function emptyTrash() {
+    error.value = null
+    try {
+      await api.emptyTrash()
+      await refreshTrash()
+      await refresh()
+      await refreshTags()
+    } catch (err) {
+      error.value = errorMessage(err)
+      throw err
+    }
   }
 
   async function restoreNote(id: string) {
@@ -421,6 +466,7 @@ export const useNotesStore = defineStore('notes', () => {
     saveStatus,
     nextCursor,
     deleted,
+    deletedCount,
     trashOpen,
     conflictNoteId,
     refresh,
@@ -429,6 +475,8 @@ export const useNotesStore = defineStore('notes', () => {
     resolveConflictOverwrite,
     closeTrash,
     restoreNote,
+    purgeNote,
+    emptyTrash,
     loadMore,
     refreshTags,
     selectNote,

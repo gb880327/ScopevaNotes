@@ -9,15 +9,15 @@ notes-core、release-readiness、search）。归档副本保留决策与验收�
 - [`openspec/changes/archive/2026-10-24-v1-notes-manager/`](openspec/changes/archive/2026-10-24-v1-notes-manager/)：v1 笔记管理器（70/70，design D1–D20、`verification.md`）
 - [`openspec/changes/archive/2026-10-24-add-markdown-import/`](openspec/changes/archive/2026-10-24-add-markdown-import/)：批量导入 Markdown（24/26，design D1–D14、`verification.md`）
 - [`openspec/changes/archive/2026-10-24-add-tag-management/`](openspec/changes/archive/2026-10-24-add-tag-management/)：标签管理（19/19，design D1–D8、`verification.md`）
+- [`openspec/changes/archive/2026-10-24-add-trash-purge/`](openspec/changes/archive/2026-10-24-add-trash-purge/)：回收站出口（17/17，design D1–D6、`verification.md`）
 
-规划中（只有规划产物，尚未实现）：
-
-- [`openspec/changes/add-trash-purge/`](openspec/changes/add-trash-purge/)：回收站出口（单条永久删除 / 清空垃圾箱）
+目前没有规划中的未实现变更：上述四个 change 都已归档，新需求从
+`openspec new change <name>` 重新开始。
 
 ```bash
 openspec validate --all --strict               # 基线规格 + 全部 change
 openspec list                                   # 活跃 change 与任务进度
-openspec status --change add-trash-purge        # 单个 change 的产物状态
+openspec status --change <name>                 # 单个 change 的产物状态
 ```
 
 改行为时先改基线规格：新建 change（`openspec new change <name>`）或直接编辑
@@ -97,6 +97,11 @@ src-tauri/
 标签管理在侧栏就地完成：重命名 / 改色 / 删除都不离开列表，删除前显示会影响多少条
 可见笔记（确认即摘除关联，笔记本身不动）；笔记头部的标签 chip 可直接摘除、可从选择器
 挂上已有标签或输入新名称即建即挂，全部走同一条自动保存写路径。
+
+回收站有真实出口：每条显示删除时间（不是「最后修改」），可单条恢复或永久删除，
+也可以一次清空；两种永久删除都要在内联确认里看到条数与「不可恢复」，取消不发请求。
+永久删除在同一事务里同时移除正文、标签关联与搜索索引，库里的记录彻底消失；
+文件不会因此变小（SQLite 只把页放入 freelist，不做 VACUUM）。
 
 批量导入 Markdown（从 Obsidian 等应用一次性迁移）：三阶段模态（选择目录 → 进度 →
 报告）、只读扫描与 dry-run 统计、隐藏目录跳过并计数、UTF-8/GB18030 解码（GB 回退逐条标注）、

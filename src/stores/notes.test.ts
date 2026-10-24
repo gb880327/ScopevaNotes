@@ -10,6 +10,10 @@ const createTag = vi.fn()
 const renameTag = vi.fn()
 const deleteTag = vi.fn()
 const setTagColor = vi.fn()
+const listDeletedNotes = vi.fn()
+const countDeletedNotes = vi.fn()
+const purgeNote = vi.fn()
+const emptyTrash = vi.fn()
 
 vi.mock('@/services/commands', () => ({
   isDesktop: false,
@@ -20,7 +24,10 @@ vi.mock('@/services/commands', () => ({
     listTags: (...args: unknown[]) => listTags(...(args as [])),
     getNote: async () => null,
     updateNote: (...args: unknown[]) => updateNote(...(args as [])),
-    listDeletedNotes: async () => [],
+    listDeletedNotes: (...args: unknown[]) => listDeletedNotes(...(args as [])),
+    countDeletedNotes: (...args: unknown[]) => countDeletedNotes(...(args as [])),
+    purgeNote: (...args: unknown[]) => purgeNote(...(args as [])),
+    emptyTrash: (...args: unknown[]) => emptyTrash(...(args as [])),
     createTag: (...args: unknown[]) => createTag(...(args as [])),
     renameTag: (...args: unknown[]) => renameTag(...(args as [])),
     deleteTag: (...args: unknown[]) => deleteTag(...(args as [])),
@@ -36,6 +43,7 @@ function summary(id: string): NoteSummary {
     updatedAt: 1_700_000_000_000,
     isFavorite: false,
     tags: [],
+    deletedAt: null,
   }
 }
 
@@ -60,8 +68,14 @@ beforeEach(() => {
   renameTag.mockReset()
   deleteTag.mockReset()
   setTagColor.mockReset()
+  listDeletedNotes.mockReset()
+  countDeletedNotes.mockReset()
+  purgeNote.mockReset()
+  emptyTrash.mockReset()
   listNotes.mockResolvedValue({ items: [], nextCursor: null })
   listTags.mockResolvedValue([])
+  listDeletedNotes.mockResolvedValue([])
+  countDeletedNotes.mockResolvedValue(0)
 })
 
 describe('notes store list ordering', () => {
@@ -318,5 +332,87 @@ describe('notes store tag management', () => {
     await expect(failure).rejects.toThrow('已创建')
     // The tag really exists, so the sidebar must show it for a retry.
     expect(store.tags.map((tag) => tag.name)).toEqual(['新标签'])
+  })
+})
+
+describe('notes store trash', () => {
+  function deadSummary(id: string, deletedAt = 1_700_000_100_000): NoteSummary {
+    return { ...summary(id), deletedAt }
+  }
+
+  it('reads the trash size from the count command, not from the capped listing', async () => {
+    listDeletedNotes.mockResolvedValue([deadSummary('note-1')])
+    countDeletedNotes.mockResolvedValue(40)
+
+    const store = useNotesStore()
+    await store.openTrash()
+
+    expect(store.deleted.map((item) => item.id)).toEqual(['note-1'])
+    expect(store.deletedCount).toBe(40)
+  })
+
+  it('drops the purged note and re-reads the library and the tag counts', async () => {
+    const store = useNotesStore()
+    listDeletedNotes.mockResolvedValue([deadSummary('note-1'), deadSummary('note-2')])
+    countDeletedNotes.mockResolvedValue(2)
+    await store.openTrash()
+
+    purgeNote.mockResolvedValue(undefined)
+    listDeletedNotes.mockResolvedValue([deadSummary('note-2')])
+    countDeletedNotes.mockResolvedValue(1)
+
+    await store.purgeNote('note-1')
+
+    expect(purgeNote).toHaveBeenCalledWith('note-1')
+    expect(store.deleted.map((item) => item.id)).toEqual(['note-2'])
+    expect(store.deletedCount).toBe(1)
+    expect(listNotes).toHaveBeenCalled()
+    expect(listTags).toHaveBeenCalled()
+  })
+
+  it('keeps the list and reports the error when a purge is rejected', async () => {
+    const store = useNotesStore()
+    listDeletedNotes.mockResolvedValue([deadSummary('note-1')])
+    countDeletedNotes.mockResolvedValue(1)
+    await store.openTrash()
+
+    purgeNote.mockRejectedValue(new Error('database is locked'))
+    listNotes.mockClear()
+
+    await expect(store.purgeNote('note-1')).rejects.toThrow('database is locked')
+
+    expect(store.deleted.map((item) => item.id)).toEqual(['note-1'])
+    expect(store.error).toContain('database is locked')
+    expect(listNotes).not.toHaveBeenCalled()
+  })
+
+  it('empties the trash and clears the local listing', async () => {
+    const store = useNotesStore()
+    listDeletedNotes.mockResolvedValue([deadSummary('note-1'), deadSummary('note-2')])
+    countDeletedNotes.mockResolvedValue(2)
+    await store.openTrash()
+
+    emptyTrash.mockResolvedValue(2)
+    listDeletedNotes.mockResolvedValue([])
+    countDeletedNotes.mockResolvedValue(0)
+
+    await store.emptyTrash()
+
+    expect(emptyTrash).toHaveBeenCalledTimes(1)
+    expect(store.deleted).toEqual([])
+    expect(store.deletedCount).toBe(0)
+  })
+
+  it('keeps the trash intact when emptying fails', async () => {
+    const store = useNotesStore()
+    listDeletedNotes.mockResolvedValue([deadSummary('note-1')])
+    countDeletedNotes.mockResolvedValue(1)
+    await store.openTrash()
+
+    emptyTrash.mockRejectedValue(new Error('write lock'))
+
+    await expect(store.emptyTrash()).rejects.toThrow('write lock')
+    expect(store.deleted.map((item) => item.id)).toEqual(['note-1'])
+    expect(store.deletedCount).toBe(1)
   })
 })

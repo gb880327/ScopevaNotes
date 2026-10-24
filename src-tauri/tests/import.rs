@@ -574,3 +574,53 @@ fn undecodable_file_is_reported_and_others_still_import() {
     drop(db);
     let _ = fs::remove_file(path);
 }
+
+/// Design D3: `source_path` occupancy is a contract. A note sitting in the trash
+/// still blocks its file (so a re-import cannot resurrect it behind the user's
+/// back); a permanently deleted note releases it.
+#[test]
+fn purging_an_imported_note_frees_its_source_path_for_a_reimport() {
+    let (db, path) = temp_db();
+    let root = scratch("purge-source");
+    let gone_path = root.join("gone.md");
+    let keep_path = root.join("keep.md");
+    fs::write(&gone_path, "# 移除\n\n要被永久删除的正文\n").unwrap();
+    fs::write(&keep_path, "# 保留\n\n一直留着\n").unwrap();
+
+    let report = import(&db, &root, ImportOptions::default(), None);
+    assert_eq!(report.imported, 2);
+
+    let id_for = |file: &PathBuf| -> String {
+        db.with_conn(|conn| {
+            Ok(conn.query_row(
+                "SELECT id FROM notes WHERE source_path = ?1",
+                [file.to_string_lossy().to_string()],
+                |row| row.get::<_, String>(0),
+            )?)
+        })
+        .unwrap()
+    };
+    let gone = id_for(&gone_path);
+    let keep = id_for(&keep_path);
+
+    // Trashed: the file is skipped, so the user's "delete" is not undone by a scan.
+    db.with_conn(|conn| note_repo::soft_delete(conn, &gone)).unwrap();
+    let while_trashed = import(&db, &root, ImportOptions::default(), None);
+    assert_eq!(while_trashed.imported, 0);
+    assert_eq!(while_trashed.skipped_existing, 2);
+
+    // Purged: the file becomes importable again as a brand-new note.
+    db.with_conn(|conn| note_repo::purge(conn, &gone)).unwrap();
+    let after_purge = import(&db, &root, ImportOptions::default(), None);
+    assert_eq!(after_purge.imported, 1, "only the released file comes back");
+    assert_eq!(after_purge.skipped_existing, 1);
+
+    let revived = id_for(&gone_path);
+    assert_ne!(revived, gone, "a re-import creates a new note");
+    let fresh = db.with_conn(|conn| note_repo::get(conn, &revived)).unwrap();
+    assert_eq!(fresh.deleted_at, None);
+    assert_eq!(db.with_conn(|conn| note_repo::get(conn, &keep)).unwrap().deleted_at, None);
+
+    let _ = fs::remove_dir_all(&root);
+    let _ = fs::remove_file(&path);
+}

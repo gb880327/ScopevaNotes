@@ -189,11 +189,17 @@ onUnmounted(() => document.removeEventListener('keydown', onEscape))
 
 <style scoped>
 .tags {
+  /* Fixed share of the sidebar: the note list and the trash have different
+     content heights, and a content-sized panel would slide around when the user
+     switches between them. */
+  flex: 0 0 auto;
+  height: 38%;
+  min-height: 104px;
+  max-height: 320px;
   border-top: 1px solid var(--border);
-  max-height: 38%;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-width: 0;
 }
 
 header {
@@ -223,6 +229,8 @@ header {
 }
 
 .scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 0 8px 8px;
 }

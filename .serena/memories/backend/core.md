@@ -52,3 +52,11 @@
 - Commands: `list_tags`, `create_tag`, `rename_tag`, `delete_tag`, `set_tag_color`. `list_with_counts` is the *only* count source — its `noteCount` excludes soft-deleted notes and is what the sidebar delete confirmation shows; do not add a per-tag query.
 - `set_color` is presentation-only: `UPDATE tags SET color`, no relation touch, **no reindex** (FTS carries tag *name*).
 - `rename` and `delete` rebuild the search projection for every affected note via `reindex_note` → O(N) full scans of `notes_fts` (`note_id` is UNINDEXED). Measured 1,000 notes ≈ 517 ms (`tests/tag_bench.rs`). Deleting a tag never deletes notes: `note_tags` cascade only.
+
+## Trash (`note_repo::{purge, purge_all, count_deleted}`, `commands/notes.rs`)
+- Commands: `list_deleted_notes`, `restore_note`, `count_deleted_notes`, `purge_note`, `empty_trash`.
+- `purge` only accepts rows with `deleted_at IS NOT NULL` (0 rows -> `NotFound`), so "permanent delete" cannot bypass the trash. Inside the transaction: delete `notes_fts` rows **first** (no FK, `note_id` UNINDEXED -> single `DELETE ... WHERE note_id IN (SELECT ...)`), then `notes`; `note_tags` follows via `ON DELETE CASCADE`. Returning `Err` before `commit` rolls the FTS delete back too.
+- `purge_all` = one statement per table (never loop `reindex_note`): 10,000 trashed notes in ~103 ms (`tests/trash_bench.rs`), 1,000 in ~10 ms. Under the 500 ms line, so no batching.
+- `count_deleted` is what the "empty trash (N)" label shows; the listing is capped by `limit`, the action is not.
+- `NoteSummary.deleted_at` is `Some` only for trash rows (D5); live listings carry `None` and the frontend `summarize()` passes it through.
+- Test helper `temp_db()` needs a per-process sequence suffix: macOS clock resolves to microseconds, so parallel tests shared one file and collided on `schema_migrations`.

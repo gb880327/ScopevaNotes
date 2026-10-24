@@ -67,6 +67,9 @@ export const api = {
     call<void>('set_note_favorite', { id, value }),
   softDeleteNote: (id: string) => call<void>('soft_delete_note', { id }),
   restoreNote: (id: string) => call<void>('restore_note', { id }),
+  countDeletedNotes: () => call<number>('count_deleted_notes'),
+  purgeNote: (id: string) => call<void>('purge_note', { id }),
+  emptyTrash: () => call<number>('empty_trash'),
 
   listTags: () => call<TagWithCount[]>('list_tags'),
   createTag: (name: string, color?: string | null) =>
