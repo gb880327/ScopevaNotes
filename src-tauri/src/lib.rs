@@ -100,6 +100,7 @@ pub fn run() {
             commands::tags::list_tags,
             commands::tags::create_tag,
             commands::tags::rename_tag,
+            commands::tags::set_tag_color,
             commands::tags::delete_tag,
             commands::libraries::get_library_info,
             commands::libraries::create_library,

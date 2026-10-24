@@ -9,6 +9,10 @@ pub fn normalize_name(raw: &str) -> String {
     raw.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+/// Every tag with its live note count.
+///
+/// The count is also the number the sidebar shows in the delete confirmation
+/// (`将影响 N 条笔记`), so callers must not run a second per-tag query for it.
 pub fn list_with_counts(conn: &Connection) -> AppResult<Vec<TagWithCount>> {
     let mut stmt = conn.prepare(
         "SELECT t.id, t.name, t.color, COUNT(n.id)
@@ -81,6 +85,28 @@ pub fn rename(conn: &mut Connection, id: &str, name: &str) -> AppResult<Tag> {
         .optional()?
         .flatten();
     tx.commit()?;
+    Ok(Tag {
+        id: id.to_string(),
+        name,
+        color,
+    })
+}
+
+/// Colour is presentation only: no relation change, no index rebuild needed
+/// (the FTS projection carries the tag *name*, never its colour).
+pub fn set_color(conn: &Connection, id: &str, color: Option<String>) -> AppResult<Tag> {
+    let changed = conn.execute(
+        "UPDATE tags SET color = ?2 WHERE id = ?1",
+        params![id, color],
+    )?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!("tag {id}")));
+    }
+    let (name, color): (String, Option<String>) = conn.query_row(
+        "SELECT name, color FROM tags WHERE id = ?1",
+        [id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
     Ok(Tag {
         id: id.to_string(),
         name,

@@ -159,10 +159,24 @@ fn rejects_missing_note_and_duplicate_tag() {
     let missing = db.with_conn(|conn| note_repo::get(conn, "does-not-exist"));
     assert!(matches!(missing, Err(AppError::NotFound(_))));
 
-    db.with_conn(|conn| tag_repo::create(conn, "work", None))
+    let work = db
+        .with_conn(|conn| tag_repo::create(conn, "work", None))
         .expect("first tag");
     let duplicate = db.with_conn(|conn| tag_repo::create(conn, "WORK", None));
     assert!(matches!(duplicate, Err(AppError::Conflict(_))));
+
+    // Colour is a presentation field: it changes without touching relations.
+    let colored = db
+        .with_conn(|conn| tag_repo::set_color(conn, &work.id, Some("#0a66c2".into())))
+        .expect("set colour");
+    assert_eq!(colored.color.as_deref(), Some("#0a66c2"));
+    assert_eq!(colored.name, "work");
+    let cleared = db
+        .with_conn(|conn| tag_repo::set_color(conn, &work.id, None))
+        .expect("clear colour");
+    assert!(cleared.color.is_none());
+    let missing_tag = db.with_conn(|conn| tag_repo::set_color(conn, "no-such-tag", None));
+    assert!(matches!(missing_tag, Err(AppError::NotFound(_))));
 
     drop(db);
     let _ = std::fs::remove_file(path);
@@ -303,6 +317,70 @@ fn search_composes_with_filters_and_skips_deleted() {
     });
     tags_only.sort();
     assert_eq!(tags_only, vec!["Prose rust".to_string(), "SQLite rust".to_string()]);
+
+    drop(db);
+    let _ = std::fs::remove_file(path);
+}
+
+/// Renaming or deleting a tag is a relation change, never a content change:
+/// the notes keep their body, timestamps and their own existence, and the
+/// search projection follows the new name.
+#[test]
+fn renaming_and_deleting_a_tag_keeps_notes_intact() {
+    let (db, path) = temp_db();
+
+    let work = db
+        .with_conn(|conn| tag_repo::create(conn, "work", None))
+        .expect("create tag");
+    let ids = ["笔记一", "笔记二", "笔记三"]
+        .iter()
+        .map(|title| seed(&db, title, "同一段正文", &[work.id.clone()]))
+        .collect::<Vec<_>>();
+    let before = ids
+        .iter()
+        .map(|id| {
+            let note = db
+                .with_conn(|conn| note_repo::get(conn, id))
+                .expect("get note");
+            (note.updated_at, note.content)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(search(&db, "work").len(), 3);
+
+    db.with_conn(|conn| tag_repo::rename(conn, &work.id, "job"))
+        .expect("rename tag");
+
+    // The old name is gone from the projection, the new one hits all three.
+    assert!(search(&db, "work").is_empty());
+    assert_eq!(search(&db, "job").len(), 3);
+    let renamed = db
+        .with_conn(|conn| tag_repo::list_with_counts(conn))
+        .expect("list tags");
+    assert_eq!(
+        renamed
+            .iter()
+            .find(|tag| tag.id == work.id)
+            .map(|tag| (tag.name.as_str(), tag.note_count)),
+        Some(("job", 3))
+    );
+
+    db.with_conn(|conn| tag_repo::delete(conn, &work.id))
+        .expect("delete tag");
+
+    // Nothing was deleted along with the tag: notes, bodies and timestamps hold.
+    for (index, id) in ids.iter().enumerate() {
+        let note = db
+            .with_conn(|conn| note_repo::get(conn, id))
+            .expect("note still exists");
+        assert_eq!(note.content, before[index].1);
+        assert_eq!(note.updated_at, before[index].0);
+        assert!(note.tags.is_empty());
+    }
+    assert!(db
+        .with_conn(|conn| tag_repo::list_with_counts(conn))
+        .expect("list tags")
+        .is_empty());
+    assert!(search(&db, "job").is_empty());
 
     drop(db);
     let _ = std::fs::remove_file(path);

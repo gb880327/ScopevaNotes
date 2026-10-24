@@ -14,7 +14,8 @@ macOS local-first Markdown notes + code snippets. Two halves in one repo:
 
 ## Where truth lives
 - Acceptance baseline: `openspec/specs/` (8 capabilities). History and rationale live in the archived changes
-  under `openspec/changes/archive/` (`2026-10-24-v1-notes-manager`, `2026-10-24-add-markdown-import`).
+  under `openspec/changes/archive/` (`2026-10-24-v1-notes-manager`, `2026-10-24-add-markdown-import`,
+  `2026-10-24-add-tag-management`).
   See `mem:specs_workflow`.
 - `docs/ARCHITECTURE.md` is a code-level reference only, never the spec.
 - Decision logs: D1-D20 in `openspec/changes/archive/2026-10-24-v1-notes-manager/design.md`,

@@ -82,3 +82,9 @@ replace newer items — the spec scenario "过期响应被丢弃" is covered by 
 `*.test.ts` next to the module (jsdom via `vitest.config.ts`), IPC always mocked at
 `@/services/commands`. Store tests set `setActivePinia(createPinia())` per case; the desktop settings
 test mocks `@tauri-apps/plugin-store` with an in-memory map instead of touching Tauri.
+
+## Tag editing write path
+- Tag/relation edits reuse the single write path: `commitNoteTags` mutates `selected`, bumps `editVersion`, `queue.discard()`, then `saveNow()` → `update_note({ tagIds })`. Never add `add_note_tag`/`remove_note_tag` commands (second write path + second index maintenance).
+- `createAndAttachTag` is deliberately two steps (create then attach). Attach failure throws `TagAttachError` (`tagCreated = true`) so the UI says "tag created but not attached"; the tag stays in the sidebar for a retry.
+- Successful tag writes re-query `list_tags` (`refreshTags()`) instead of optimistic ±1 on counts.
+- Popovers inside the sidebar/`.meta` **must not** be `position: absolute`: `.scroll` (`overflow-y: auto`) and `.meta` (`overflow-x: auto`) clip them to one line. Render them in flow (palette = wrapped second line of the row, NoteHeader picker = sibling below the chip row).

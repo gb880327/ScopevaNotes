@@ -8,16 +8,16 @@ notes-core、release-readiness、search）。归档副本保留决策与验收�
 
 - [`openspec/changes/archive/2026-10-24-v1-notes-manager/`](openspec/changes/archive/2026-10-24-v1-notes-manager/)：v1 笔记管理器（70/70，design D1–D20、`verification.md`）
 - [`openspec/changes/archive/2026-10-24-add-markdown-import/`](openspec/changes/archive/2026-10-24-add-markdown-import/)：批量导入 Markdown（24/26，design D1–D14、`verification.md`）
+- [`openspec/changes/archive/2026-10-24-add-tag-management/`](openspec/changes/archive/2026-10-24-add-tag-management/)：标签管理（19/19，design D1–D8、`verification.md`）
 
 规划中（只有规划产物，尚未实现）：
 
-- [`openspec/changes/add-tag-management/`](openspec/changes/add-tag-management/)：标签的集中管理（新增 / 重命名 / 改色 / 删除）与笔记标签编辑
 - [`openspec/changes/add-trash-purge/`](openspec/changes/add-trash-purge/)：回收站出口（单条永久删除 / 清空垃圾箱）
 
 ```bash
 openspec validate --all --strict               # 基线规格 + 全部 change
 openspec list                                   # 活跃 change 与任务进度
-openspec status --change add-tag-management     # 单个 change 的产物状态
+openspec status --change add-trash-purge        # 单个 change 的产物状态
 ```
 
 改行为时先改基线规格：新建 change（`openspec new change <name>`）或直接编辑
@@ -93,6 +93,10 @@ src-tauri/
 预览安全（html:false + 协议白名单）与 Shiki 按需语法高亮、CodeMirror 主题联动
 （编辑器与预览随深浅色同步换色）、全站文字对比度守门（`src/styles/tokens.test.ts`
 对文本令牌 × 表面 × 主题 × 强调色断言 WCAG AA）。
+
+标签管理在侧栏就地完成：重命名 / 改色 / 删除都不离开列表，删除前显示会影响多少条
+可见笔记（确认即摘除关联，笔记本身不动）；笔记头部的标签 chip 可直接摘除、可从选择器
+挂上已有标签或输入新名称即建即挂，全部走同一条自动保存写路径。
 
 批量导入 Markdown（从 Obsidian 等应用一次性迁移）：三阶段模态（选择目录 → 进度 →
 报告）、只读扫描与 dry-run 统计、隐藏目录跳过并计数、UTF-8/GB18030 解码（GB 回退逐条标注）、

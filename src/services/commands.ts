@@ -72,6 +72,8 @@ export const api = {
   createTag: (name: string, color?: string | null) =>
     call<Tag>('create_tag', { name, color: color ?? null }),
   renameTag: (id: string, name: string) => call<Tag>('rename_tag', { id, name }),
+  setTagColor: (id: string, color: string | null) =>
+    call<Tag>('set_tag_color', { id, color }),
   deleteTag: (id: string) => call<void>('delete_tag', { id }),
 
   getLibraryInfo: () => call<LibraryInfo>('get_library_info'),

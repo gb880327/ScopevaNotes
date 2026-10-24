@@ -86,3 +86,85 @@ describe('NoteHeader', () => {
     expect(wrapper.find('.tag').text()).toBe('工作')
   })
 })
+
+describe('NoteHeader tag editing', () => {
+  it('renders one removable chip per tag plus an add button', () => {
+    const { wrapper } = mountHeader()
+    expect(wrapper.findAll('.chip-x')).toHaveLength(1)
+    expect(wrapper.find('.chip-add').exists()).toBe(true)
+  })
+
+  it('offers only the tags the note does not carry yet', async () => {
+    const { wrapper, notes } = mountHeader()
+    notes.tags = [
+      { id: 'tag-1', name: '工作', color: null, noteCount: 2 },
+      { id: 'tag-2', name: '读书', color: null, noteCount: 1 },
+    ]
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('.chip-add').trigger('click')
+
+    const options = wrapper.findAll('.tag-picker .option').map((node) => node.text())
+    expect(options).toEqual(['读书'])
+  })
+
+  it('attaches an existing tag and closes the picker', async () => {
+    const { wrapper, notes } = mountHeader()
+    notes.tags = [{ id: 'tag-2', name: '读书', color: null, noteCount: 1 }]
+    const attach = vi.spyOn(notes, 'attachTag').mockResolvedValue(undefined)
+    await wrapper.vm.$nextTick()
+
+    await wrapper.find('.chip-add').trigger('click')
+    await wrapper.find('.tag-picker .option').trigger('click')
+    await flushPromises()
+
+    expect(attach).toHaveBeenCalledWith('tag-2')
+    expect(wrapper.find('.tag-picker').exists()).toBe(false)
+  })
+
+  it('creates and attaches a new tag name', async () => {
+    const { wrapper, notes } = mountHeader()
+    const create = vi.spyOn(notes, 'createAndAttachTag').mockResolvedValue(undefined)
+
+    await wrapper.find('.chip-add').trigger('click')
+    await wrapper.find('input.new-tag').setValue('新标签')
+    await wrapper.find('input.new-tag').trigger('keydown.enter')
+    await flushPromises()
+
+    expect(create).toHaveBeenCalledWith('新标签')
+  })
+
+  it('detaches a tag from the open note', async () => {
+    const { wrapper, notes } = mountHeader()
+    const detach = vi.spyOn(notes, 'detachTag').mockResolvedValue(undefined)
+
+    await wrapper.find('.chip-x').trigger('click')
+    await flushPromises()
+
+    expect(detach).toHaveBeenCalledWith('tag-1')
+  })
+
+  it('lets a read-only note edit its tags', async () => {
+    const { wrapper, notes, ui } = mountHeader()
+    ui.viewMode = 'read'
+    const detach = vi.spyOn(notes, 'detachTag').mockResolvedValue(undefined)
+
+    await wrapper.vm.$nextTick()
+    await wrapper.find('.chip-x').trigger('click')
+    await flushPromises()
+
+    expect(detach).toHaveBeenCalled()
+    expect(wrapper.find('input.title-input').exists()).toBe(false)
+  })
+
+  it('keeps the chip and shows the error when the save fails', async () => {
+    const { wrapper, notes } = mountHeader()
+    vi.spyOn(notes, 'detachTag').mockRejectedValue(new Error('database is locked'))
+
+    await wrapper.find('.chip-x').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[role="alert"]').text()).toContain('database is locked')
+    expect(wrapper.findAll('.chip-x')).toHaveLength(1)
+  })
+})

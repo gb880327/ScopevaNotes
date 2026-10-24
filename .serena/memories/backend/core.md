@@ -47,3 +47,8 @@
 - `ensure_not_newer` refuses to open a library written by a newer build.
 - A migration that changes the FTS projection format must be listed in `REINDEX_VERSIONS` so
   `search_index::reindex_all` runs right after it (CJK explosion cannot be expressed in SQL).
+
+## Tags (`repositories/tag_repo.rs`, `commands/tags.rs`)
+- Commands: `list_tags`, `create_tag`, `rename_tag`, `delete_tag`, `set_tag_color`. `list_with_counts` is the *only* count source — its `noteCount` excludes soft-deleted notes and is what the sidebar delete confirmation shows; do not add a per-tag query.
+- `set_color` is presentation-only: `UPDATE tags SET color`, no relation touch, **no reindex** (FTS carries tag *name*).
+- `rename` and `delete` rebuild the search projection for every affected note via `reindex_note` → O(N) full scans of `notes_fts` (`note_id` is UNINDEXED). Measured 1,000 notes ≈ 517 ms (`tests/tag_bench.rs`). Deleting a tag never deletes notes: `note_tags` cascade only.

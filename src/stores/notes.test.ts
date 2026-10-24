@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { useNotesStore } from './notes'
-import type { NoteSummary } from '@/services/types'
+import { useNotesStore, TagAttachError } from './notes'
+import type { NoteDetail, NoteSummary, TagWithCount } from '@/services/types'
 
 const listNotes = vi.fn()
 const updateNote = vi.fn()
+const listTags = vi.fn()
+const createTag = vi.fn()
+const renameTag = vi.fn()
+const deleteTag = vi.fn()
+const setTagColor = vi.fn()
 
 vi.mock('@/services/commands', () => ({
   isDesktop: false,
@@ -12,10 +17,14 @@ vi.mock('@/services/commands', () => ({
   errorMessage: (error: unknown) => String(error),
   api: {
     listNotes: (...args: unknown[]) => listNotes(...(args as [])),
-    listTags: async () => [],
+    listTags: (...args: unknown[]) => listTags(...(args as [])),
     getNote: async () => null,
     updateNote: (...args: unknown[]) => updateNote(...(args as [])),
     listDeletedNotes: async () => [],
+    createTag: (...args: unknown[]) => createTag(...(args as [])),
+    renameTag: (...args: unknown[]) => renameTag(...(args as [])),
+    deleteTag: (...args: unknown[]) => deleteTag(...(args as [])),
+    setTagColor: (...args: unknown[]) => setTagColor(...(args as [])),
   },
 }))
 
@@ -46,6 +55,13 @@ beforeEach(() => {
   setActivePinia(createPinia())
   listNotes.mockReset()
   updateNote.mockReset()
+  listTags.mockReset()
+  createTag.mockReset()
+  renameTag.mockReset()
+  deleteTag.mockReset()
+  setTagColor.mockReset()
+  listNotes.mockResolvedValue({ items: [], nextCursor: null })
+  listTags.mockResolvedValue([])
 })
 
 describe('notes store list ordering', () => {
@@ -180,5 +196,127 @@ describe('notes store optimistic concurrency', () => {
     // timestamp — never overwrite text typed while the request was in flight.
     expect(store.selected?.content).toBe('second draft')
     expect(store.selected?.updatedAt).toBe(2)
+  })
+})
+
+function tagWithCount(id: string, name: string, noteCount = 1): TagWithCount {
+  return { id, name, color: null, noteCount }
+}
+
+function noteWithTags(tags: NoteDetail['tags']): NoteDetail {
+  return {
+    id: 'note-1',
+    title: '标题',
+    content: '正文',
+    isFavorite: false,
+    deletedAt: null,
+    createdAt: 1,
+    updatedAt: 1,
+    tags,
+  }
+}
+
+describe('notes store tag management', () => {
+  it('renames the tag in the sidebar and on the open note, then re-queries', async () => {
+    const store = useNotesStore()
+    store.tags = [tagWithCount('tag-1', 'db', 3)]
+    store.selected = noteWithTags([{ id: 'tag-1', name: 'db', color: null }])
+    renameTag.mockResolvedValue({ id: 'tag-1', name: 'database', color: null })
+    listTags.mockResolvedValue([tagWithCount('tag-1', 'database', 3)])
+
+    await store.renameTag('tag-1', 'database')
+
+    expect(renameTag).toHaveBeenCalledWith('tag-1', 'database')
+    expect(store.tags.map((tag) => tag.name)).toEqual(['database'])
+    expect(store.selected?.tags[0].name).toBe('database')
+    // Tag names live in the search projection, so the list is re-queried.
+    expect(listNotes).toHaveBeenCalled()
+  })
+
+  it('keeps the sidebar untouched when a rename is rejected', async () => {
+    const store = useNotesStore()
+    store.tags = [tagWithCount('tag-1', 'db', 3)]
+    renameTag.mockRejectedValue(new Error('tag already exists: rust'))
+
+    await expect(store.renameTag('tag-1', 'rust')).rejects.toThrow('already exists')
+
+    expect(store.tags.map((tag) => tag.name)).toEqual(['db'])
+    expect(store.error).toContain('already exists')
+  })
+
+  it('drops the tag and its filter on delete, without touching notes', async () => {
+    const store = useNotesStore()
+    store.tags = [tagWithCount('tag-1', 'db', 3), tagWithCount('tag-2', 'work')]
+    store.activeTagIds = ['tag-1']
+    store.selected = noteWithTags([{ id: 'tag-1', name: 'db', color: null }])
+    deleteTag.mockResolvedValue(undefined)
+    listTags.mockResolvedValue([tagWithCount('tag-2', 'work')])
+
+    await store.deleteTag('tag-1')
+
+    expect(store.tags.map((tag) => tag.id)).toEqual(['tag-2'])
+    expect(store.activeTagIds).toEqual([])
+    expect(store.selected?.tags).toEqual([])
+  })
+
+  it('stores a tag colour and reflects it on the open note', async () => {
+    const store = useNotesStore()
+    store.tags = [tagWithCount('tag-1', 'db')]
+    store.selected = noteWithTags([{ id: 'tag-1', name: 'db', color: null }])
+    setTagColor.mockResolvedValue({ id: 'tag-1', name: 'db', color: '#0a66c2' })
+    listTags.mockResolvedValue([{ ...tagWithCount('tag-1', 'db'), color: '#0a66c2' }])
+
+    await store.setTagColor('tag-1', '#0a66c2')
+
+    expect(setTagColor).toHaveBeenCalledWith('tag-1', '#0a66c2')
+    expect(store.tags[0].color).toBe('#0a66c2')
+    expect(store.selected?.tags[0].color).toBe('#0a66c2')
+  })
+
+  it('attaches a tag through update_note and refreshes the counts', async () => {
+    const store = useNotesStore()
+    store.tags = [tagWithCount('tag-2', 'work', 1)]
+    store.selected = noteWithTags([])
+    updateNote.mockImplementation(async (args: { tagIds: string[] }) => ({
+      ...noteWithTags([{ id: 'tag-2', name: 'work', color: null }]),
+      updatedAt: 2,
+      tags: args.tagIds.map((id) => ({ id, name: 'work', color: null })),
+    }))
+
+    await store.attachTag('tag-2')
+
+    expect(updateNote).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'note-1', tagIds: ['tag-2'] }),
+    )
+    expect(store.selected?.tags.map((tag) => tag.id)).toEqual(['tag-2'])
+    expect(listTags).toHaveBeenCalled()
+  })
+
+  it('detaches a tag through update_note and refreshes the counts', async () => {
+    const store = useNotesStore()
+    store.selected = noteWithTags([{ id: 'tag-1', name: 'db', color: null }])
+    updateNote.mockResolvedValue({ ...noteWithTags([]), updatedAt: 2 })
+
+    await store.detachTag('tag-1')
+
+    expect(updateNote).toHaveBeenCalledWith(expect.objectContaining({ tagIds: [] }))
+    expect(store.selected?.tags).toEqual([])
+    expect(listTags).toHaveBeenCalled()
+  })
+
+  it('flags a tag that was created but could not be attached', async () => {
+    const store = useNotesStore()
+    store.selected = noteWithTags([])
+    createTag.mockResolvedValue({ id: 'tag-9', name: '新标签', color: null })
+    listTags.mockResolvedValue([tagWithCount('tag-9', '新标签', 0)])
+    updateNote.mockRejectedValue(new Error('database is locked'))
+
+    const failure = store.createAndAttachTag('新标签')
+
+    await expect(failure).rejects.toBeInstanceOf(TagAttachError)
+    await expect(failure).rejects.toMatchObject({ tagCreated: true })
+    await expect(failure).rejects.toThrow('已创建')
+    // The tag really exists, so the sidebar must show it for a retry.
+    expect(store.tags.map((tag) => tag.name)).toEqual(['新标签'])
   })
 })

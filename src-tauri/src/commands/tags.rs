@@ -28,6 +28,16 @@ pub async fn rename_tag(state: State<'_, AppState>, id: String, name: String) ->
 }
 
 #[tauri::command]
+pub async fn set_tag_color(
+    state: State<'_, AppState>,
+    id: String,
+    color: Option<String>,
+) -> AppResult<Tag> {
+    let db = state.db();
+    blocking(move || db.with_conn(|conn| tag_repo::set_color(conn, &id, color))).await
+}
+
+#[tauri::command]
 pub async fn delete_tag(state: State<'_, AppState>, id: String) -> AppResult<()> {
     let db = state.db();
     blocking(move || db.with_conn(|conn| tag_repo::delete(conn, &id))).await

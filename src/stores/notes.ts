@@ -1,10 +1,24 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { api, CommandError, errorMessage } from '@/services/commands'
-import type { NoteDetail, NoteSummary, TagWithCount } from '@/services/types'
+import type { NoteDetail, NoteSummary, Tag, TagWithCount } from '@/services/types'
 import { createAutosaveQueue } from '@/composables/useAutosave'
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'conflict'
+
+/**
+ * Thrown by `createAndAttachTag` when the tag row was created but hanging it on
+ * the note failed. The tag exists in the sidebar, so the caller must say so
+ * instead of pretending nothing happened.
+ */
+export class TagAttachError extends Error {
+  readonly tagCreated = true
+
+  constructor(message: string) {
+    super(message)
+    this.name = 'TagAttachError'
+  }
+}
 
 function summarize(note: NoteDetail): NoteSummary {
   return {
@@ -261,12 +275,114 @@ export const useNotesStore = defineStore('notes', () => {
     }
   }
 
-  async function createTag(name: string) {
+  async function createTag(name: string): Promise<Tag> {
     try {
-      await api.createTag(name)
+      const tag = await api.createTag(name)
+      await refreshTags()
+      return tag
+    } catch (err) {
+      error.value = errorMessage(err)
+      throw err
+    }
+  }
+
+  /** Rename the tag entity itself; notes keep their association. */
+  async function renameTag(id: string, name: string): Promise<void> {
+    try {
+      const renamed = await api.renameTag(id, name)
+      const entry = tags.value.find((tag) => tag.id === id)
+      if (entry) entry.name = renamed.name
+      const onNote = selected.value?.tags.find((tag) => tag.id === id)
+      if (onNote) onNote.name = renamed.name
+      await refreshTags()
+      // Tag names are part of the search projection, so hits may change too.
+      await refresh()
+    } catch (err) {
+      error.value = errorMessage(err)
+      throw err
+    }
+  }
+
+  async function setTagColor(id: string, color: string | null): Promise<void> {
+    try {
+      const updated = await api.setTagColor(id, color)
+      const entry = tags.value.find((tag) => tag.id === id)
+      if (entry) entry.color = updated.color
+      const onNote = selected.value?.tags.find((tag) => tag.id === id)
+      if (onNote) onNote.color = updated.color
       await refreshTags()
     } catch (err) {
       error.value = errorMessage(err)
+      throw err
+    }
+  }
+
+  /** Delete the entity. `note_tags` cascades; no note is ever deleted. */
+  async function deleteTag(id: string): Promise<void> {
+    try {
+      await api.deleteTag(id)
+      tags.value = tags.value.filter((tag) => tag.id !== id)
+      activeTagIds.value = activeTagIds.value.filter((tagId) => tagId !== id)
+      if (selected.value) {
+        selected.value.tags = selected.value.tags.filter((tag) => tag.id !== id)
+      }
+      await refreshTags()
+      await refresh()
+    } catch (err) {
+      error.value = errorMessage(err)
+      throw err
+    }
+  }
+
+  /**
+   * Apply a tag change to the open note and persist it immediately.
+   *
+   * Tag edits reuse the normal `update_note` path (one write path, one index
+   * rebuild) instead of dedicated add/remove commands. The debounce is dropped
+   * so the caller can await the write and surface a failure right away.
+   */
+  async function commitNoteTags(mutate: (note: NoteDetail) => void): Promise<void> {
+    const note = selected.value
+    if (!note) return
+    mutate(note)
+    editVersion += 1
+    saveStatus.value = 'idle'
+    queue.discard()
+    await saveNow()
+  }
+
+  async function attachTagObject(tag: Tag): Promise<void> {
+    const note = selected.value
+    if (!note || note.tags.some((current) => current.id === tag.id)) return
+    await commitNoteTags((current) => {
+      current.tags = [...current.tags, { id: tag.id, name: tag.name, color: tag.color }]
+    })
+    await refreshTags()
+  }
+
+  async function attachTag(tagId: string): Promise<void> {
+    const tag = tags.value.find((entry) => entry.id === tagId)
+    if (!tag) return
+    await attachTagObject(tag)
+  }
+
+  async function detachTag(tagId: string): Promise<void> {
+    if (!selected.value) return
+    await commitNoteTags((note) => {
+      note.tags = note.tags.filter((tag) => tag.id !== tagId)
+    })
+    await refreshTags()
+  }
+
+  /** Create-if-absent, then hang it on the open note. */
+  async function createAndAttachTag(name: string): Promise<void> {
+    const created = await createTag(name)
+    try {
+      await attachTagObject(created)
+    } catch (err) {
+      throw new TagAttachError(
+        `${errorMessage(err)}（标签「${created.name}」已创建，但没有挂到这条笔记上）`,
+      )
     }
   }
 
@@ -322,6 +438,12 @@ export const useNotesStore = defineStore('notes', () => {
     toggleFavorite,
     deleteSelected,
     createTag,
+    renameTag,
+    setTagColor,
+    deleteTag,
+    attachTag,
+    detachTag,
+    createAndAttachTag,
     toggleTagFilter,
     clearTagFilters,
     clearFilters,
