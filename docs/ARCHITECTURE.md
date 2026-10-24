@@ -22,6 +22,7 @@ services/commands.ts   ──────▶  models/*          DTO + AppError
   `commands::blocking(|| db.with_conn(..))` 进入 `spawn_blocking`，不阻塞 UI 线程。
 - 迁移在 `database/migrations.rs` 顺序执行，每个版本一个事务；未知的更高版本直接拒绝写入。
 - 时间戳统一 Unix 毫秒 UTC；ID 使用 UUIDv7。
+- 搜索为 FTS 粗筛（`MATCH`，中文逐字展开）+ 字面 `LIKE` 精筛，见 `design.md` D15。
 - `notes_fts` 由 `search_index::reindex_note` 在同一事务内重建；创建、更新、软删除、
   恢复、标签改名/删除都会触发。
 - 备份使用 `VACUUM INTO`，目标已存在则报错，不做覆盖。

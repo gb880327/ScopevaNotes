@@ -7,7 +7,13 @@ use crate::models::{AppError, AppResult};
 const MIGRATIONS: &[(i64, &str)] = &[
     (1, include_str!("../../migrations/0001_init.sql")),
     (2, include_str!("../../migrations/0002_fts.sql")),
+    (3, include_str!("../../migrations/0003_search_reindex.sql")),
 ];
+
+/// Migrations that change the shape of the search projection. After they run,
+/// `notes_fts` is rebuilt from `notes` (Rust-side, because the CJK explosion
+/// cannot be expressed in SQL).
+const REINDEX_VERSIONS: &[i64] = &[3];
 
 pub const LATEST_VERSION: i64 = MIGRATIONS[MIGRATIONS.len() - 1].0;
 
@@ -18,6 +24,7 @@ const META_DDL: &str = "CREATE TABLE IF NOT EXISTS schema_migrations (
 
 pub fn run(conn: &mut Connection) -> AppResult<()> {
     conn.execute_batch(META_DDL)?;
+    let mut applied_versions: Vec<i64> = Vec::new();
     for (version, sql) in MIGRATIONS {
         let applied: bool = conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version = ?1)",
@@ -35,6 +42,13 @@ pub fn run(conn: &mut Connection) -> AppResult<()> {
             params![version, super::now_ms()],
         )?;
         tx.commit()?;
+        applied_versions.push(*version);
+    }
+    if applied_versions
+        .iter()
+        .any(|version| REINDEX_VERSIONS.contains(version))
+    {
+        super::search_index::reindex_all(conn)?;
     }
     Ok(())
 }

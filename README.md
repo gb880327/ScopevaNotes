@@ -57,4 +57,4 @@ src-tauri/
 启动静默、退出确认（先 flush 再确认）、关闭即隐藏、窗口居中/置顶/尺寸记忆、
 笔记库打开/新建/迁移/备份与占用统计、开机启动开关。
 
-未完成：FTS 搜索（当前为 LIKE 子串）、Shiki 高亮、签名分发、macOS 实机交互验收。剩余工作见 `openspec/changes/v1-notes-manager/tasks.md` 未勾选项。
+未完成：Shiki 高亮、签名分发、macOS 实机交互验收。剩余工作见 `openspec/changes/v1-notes-manager/tasks.md` 未勾选项。

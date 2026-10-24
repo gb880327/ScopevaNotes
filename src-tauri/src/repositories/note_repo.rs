@@ -97,10 +97,45 @@ pub fn list(conn: &Connection, query: &ListQuery) -> AppResult<NoteSummaryPage> 
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        let pattern = format!("%{}%", escape_like(term));
-        sql.push_str(" AND (n.title LIKE ? ESCAPE '\\' OR n.content LIKE ? ESCAPE '\\')");
-        args.push(Value::Text(pattern.clone()));
-        args.push(Value::Text(pattern));
+        // Two passes, both needed:
+        //   1. coarse — FTS5 narrows the candidate set from an index;
+        //   2. fine   — every user word must appear *literally* in the title,
+        //               body or a tag name, so `100%` cannot match `1000` and
+        //               FTS tokenisation never decides the result.
+        //
+        // Tags are resolved through `note_tags`/`tags`, never through a
+        // correlated `EXISTS` on `notes_fts`: `note_id` is UNINDEXED there, so
+        // each outer row would rescan the whole FTS table (O(n²) — 54 s at 10k
+        // notes, measured before this was fixed).
+        match search_index::to_match_query(term) {
+            Some(expression) => {
+                sql.push_str(
+                    " AND n.id IN (SELECT note_id FROM notes_fts WHERE notes_fts MATCH ?)",
+                );
+                args.push(Value::Text(expression));
+            }
+            None => {}
+        }
+
+        let tokens: Vec<&str> = term.split_whitespace().collect();
+        let mut literal = Vec::with_capacity(tokens.len());
+        for _ in &tokens {
+            literal.push(
+                "(n.title LIKE ? ESCAPE '\\' OR n.content LIKE ? ESCAPE '\\'
+                  OR n.id IN (SELECT nt.note_id FROM note_tags nt
+                              JOIN tags t ON t.id = nt.tag_id
+                              WHERE t.name LIKE ? ESCAPE '\\'))",
+            );
+        }
+        for token in &tokens {
+            let pattern = format!("%{}%", escape_like(token));
+            args.push(Value::Text(pattern.clone()));
+            args.push(Value::Text(pattern.clone()));
+            args.push(Value::Text(pattern));
+        }
+        if !literal.is_empty() {
+            sql.push_str(&format!(" AND ({})", literal.join(") AND (")));
+        }
     }
     if query.favorites_only {
         sql.push_str(" AND n.is_favorite = 1");
