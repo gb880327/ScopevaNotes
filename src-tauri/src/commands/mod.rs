@@ -1,5 +1,6 @@
 pub mod libraries;
 pub mod notes;
+pub mod quit;
 pub mod shortcuts;
 pub mod tags;
 pub mod window;

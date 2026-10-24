@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use crate::database::Database;
@@ -7,6 +8,10 @@ pub struct AppState {
     db: RwLock<Arc<Database>>,
     library: Mutex<LibraryInfo>,
     shortcut: Mutex<String>,
+    /// Set once the user confirmed quitting, so the exit interception in
+    /// `lib.rs` lets the process die instead of asking again.
+    quitting: AtomicBool,
+    quit_pending: AtomicBool,
     pub window: crate::platform::macos::window_manager::WindowManager,
 }
 
@@ -16,6 +21,8 @@ impl AppState {
             db: RwLock::new(Arc::new(db)),
             library: Mutex::new(library),
             shortcut: Mutex::new(shortcut),
+            quitting: AtomicBool::new(false),
+            quit_pending: AtomicBool::new(false),
             window: Default::default(),
         }
     }
@@ -42,6 +49,26 @@ impl AppState {
 
     pub fn set_shortcut(&self, accelerator: &str) {
         *self.shortcut.lock().expect("state lock poisoned") = accelerator.to_string();
+    }
+
+    /// Marks the confirmed quit. Every later exit request passes through.
+    pub fn allow_exit(&self) {
+        self.quitting.store(true, Ordering::SeqCst);
+    }
+
+    pub fn exit_allowed(&self) -> bool {
+        self.quitting.load(Ordering::SeqCst)
+    }
+
+    /// One dialog at a time, even if the shortcut and the tray fire together.
+    pub fn begin_quit_prompt(&self) -> bool {
+        !self
+            .quit_pending
+            .swap(true, Ordering::SeqCst)
+    }
+
+    pub fn end_quit_prompt(&self) {
+        self.quit_pending.store(false, Ordering::SeqCst);
     }
 }
 

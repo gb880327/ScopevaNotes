@@ -79,6 +79,9 @@ export const api = {
   getGlobalShortcut: () => call<string>('get_global_shortcut'),
   setGlobalShortcut: (accelerator: string) =>
     call<string>('set_global_shortcut', { accelerator }),
+
+  /** Ask for the quit confirmation dialog; the app exits only if confirmed. */
+  requestQuit: () => call<void>('request_quit'),
 }
 
 export function errorMessage(err: unknown): string {

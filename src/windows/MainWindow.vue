@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { message } from '@tauri-apps/plugin-dialog'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import SidebarSplitter from '@/components/layout/SidebarSplitter.vue'
 import ContentPane from '@/components/layout/ContentPane.vue'
@@ -10,7 +11,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
 import { useTheme } from '@/composables/useTheme'
 import { useKeyboard } from '@/composables/useKeyboard'
-import { isDesktop } from '@/services/commands'
+import { api, errorMessage, isDesktop } from '@/services/commands'
 
 const notes = useNotesStore()
 const settings = useSettingsStore()
@@ -32,9 +33,32 @@ onMounted(async () => {
       listen('ui://new-note', () => void notes.createNote()),
       listen('ui://open-settings', () => ui.openSettings()),
       listen('ui://open-library', () => ui.openSettings()),
+      listen('ui://quit-requested', () => void handleQuitRequest()),
     ])
   }
 })
+
+/// Flush first, confirm second: the dialog must never show before the pending
+/// edit is on disk, and a failed save keeps the app alive.
+async function handleQuitRequest() {
+  try {
+    await notes.flush()
+  } catch (err) {
+    await message(`保存失败，已取消退出：${errorMessage(err)}`, {
+      title: '退出 Notes',
+      kind: 'error',
+    })
+    return
+  }
+  if (notes.saveStatus === 'error') {
+    await message(`保存失败，已取消退出：${notes.error ?? '未知错误'}`, {
+      title: '退出 Notes',
+      kind: 'error',
+    })
+    return
+  }
+  await api.requestQuit()
+}
 
 onBeforeUnmount(() => {
   for (const stop of unlisten) stop()

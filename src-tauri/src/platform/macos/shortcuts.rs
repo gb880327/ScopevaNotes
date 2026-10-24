@@ -20,6 +20,25 @@ fn parse(accelerator: &str) -> AppResult<Shortcut> {
     Ok(shortcut)
 }
 
+/// Renders an accelerator as macOS symbols (⌃⌥⇧⌘D) for dialogs and menus.
+pub fn display(accelerator: &str) -> String {
+    const ORDER: [&str; 4] = ["⌃", "⌥", "⇧", "⌘"];
+    let mut mods: Vec<&str> = Vec::new();
+    let mut key = "";
+    for part in accelerator.split('+').map(str::trim).filter(|p| !p.is_empty()) {
+        match part.to_ascii_lowercase().as_str() {
+            "command" | "cmd" | "super" | "commandorcontrol" | "cmdorctrl" => mods.push("⌘"),
+            "control" | "ctrl" => mods.push("⌃"),
+            "alt" | "option" => mods.push("⌥"),
+            "shift" => mods.push("⇧"),
+            _ => key = part,
+        }
+    }
+    mods.sort_by_key(|m| ORDER.iter().position(|o| o == m).unwrap_or(ORDER.len()));
+    mods.dedup();
+    format!("{}{}", mods.concat(), key)
+}
+
 /// Registers the startup accelerator. A taken shortcut must not abort startup.
 pub fn register<R: Runtime>(app: &AppHandle<R>, accelerator: &str) -> AppResult<Shortcut> {
     let shortcut = parse(accelerator)?;
@@ -87,6 +106,13 @@ mod tests {
         for accelerator in ["Command+Alt+K", "CommandOrControl+Shift+1", "Control+F5", "Super+Space"] {
             assert!(parse(accelerator).is_ok(), "{accelerator} should parse");
         }
+    }
+
+    #[test]
+    fn renders_macos_symbols_in_apple_order() {
+        assert_eq!(display(DEFAULT_SHORTCUT), "⇧⌘D");
+        assert_eq!(display("Shift+Command+Alt+Control+K"), "⌃⌥⇧⌘K");
+        assert_eq!(display("Command+Space"), "⌘Space");
     }
 
     #[test]

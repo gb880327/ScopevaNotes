@@ -6,7 +6,8 @@ pub mod repositories;
 pub mod services;
 pub mod state;
 
-use tauri::{Manager, WindowEvent};
+use tauri::{Emitter, Manager, WindowEvent};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_global_shortcut::ShortcutState;
 
 use crate::platform::macos::{shortcuts, tray};
@@ -65,11 +66,9 @@ pub fn run() {
                 eprintln!("[shortcut] registration failed: {err}");
             }
 
-            // Bootstrap: the window starts hidden; first run needs to be
-            // reachable before there is an onboarding flow.
-            if let Some(state) = handle.try_state::<AppState>() {
-                let _ = state.window.show(&handle);
-            }
+            // Silent start: the window stays hidden until the tray, the
+            // shortcut or Dock activation asks for it (spec: 启动不显示主窗口).
+            show_first_run_tip(&handle);
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -104,7 +103,53 @@ pub fn run() {
             commands::window::toggle_main_window,
             commands::shortcuts::get_global_shortcut,
             commands::shortcuts::set_global_shortcut,
+            commands::quit::request_quit,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // ⌘Q, Dock quit and the tray item all arrive here (or emit the
+            // event themselves). Block the exit until the user confirmed;
+            // `allow_exit` is set by the confirmation dialog.
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                if let Some(state) = app.try_state::<AppState>() {
+                    if !state.exit_allowed() {
+                        api.prevent_exit();
+                        // If no webview is listening (early startup or a
+                        // crashed frontend) there is nothing to save or ask.
+                        if app.emit("ui://quit-requested", ()).is_err() {
+                            state.allow_exit();
+                            app.exit(0);
+                        }
+                    }
+                }
+            }
+        });
+}
+
+/// Shown once, while the window stays hidden, so a silent start is not
+/// mistaken for a failed launch. The marker lives outside the settings store
+/// so it cannot race the frontend's writes.
+fn show_first_run_tip(app: &tauri::AppHandle) {
+    let Ok(dir) = app.path().app_config_dir() else {
+        return;
+    };
+    let marker = dir.join("onboarding-shortcut-tip");
+    if marker.exists() {
+        return;
+    }
+    let accelerator = app
+        .try_state::<AppState>()
+        .map(|state| shortcuts::display(&state.shortcut()))
+        .unwrap_or_else(|| shortcuts::display(shortcuts::DEFAULT_SHORTCUT));
+    app.dialog()
+        .message(format!(
+            "Notes 已在菜单栏运行，不会自动打开窗口。\n\n按 {accelerator} 显示或隐藏窗口；也可以在菜单栏图标或设置的「全局快捷键」里换成其他组合。"
+        ))
+        .title("Notes")
+        .kind(MessageDialogKind::Info)
+        .show(|_| {});
+    if std::fs::create_dir_all(&dir).is_ok() {
+        let _ = std::fs::write(&marker, b"1");
+    }
 }

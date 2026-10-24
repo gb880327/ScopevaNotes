@@ -35,6 +35,7 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
         .icon_as_template(false)
+        .tooltip("Notes")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -51,7 +52,10 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
                 let _ = app.emit("ui://open-settings", ());
                 click_toggle(app);
             }
-            "quit" => app.exit(0),
+            // Same path as ⌘Q: the frontend flushes, then asks for confirmation.
+            "quit" => {
+                let _ = app.emit("ui://quit-requested", ());
+            }
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
