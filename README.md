@@ -38,7 +38,7 @@ Gatekeeper 放行方式见 `docs/RELEASE.md`。
 性能与驻留：
 
 ```bash
-scripts/perf-check.sh startup   # 进程 / 库打开 / WebKit 内容进程 三个里程碑
+scripts/perf-check.sh startup   # 进程出现 / 笔记库打开 两个里程碑
 scripts/perf-check.sh soak 24   # 24h 空闲采样（CPU% / RSS）
 ```
 

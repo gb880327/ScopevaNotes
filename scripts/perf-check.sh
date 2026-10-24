@@ -4,9 +4,12 @@
 #   scripts/perf-check.sh startup [app-path]   launch twice, report milestones
 #   scripts/perf-check.sh soak <hours> [app]   sample CPU/RSS until stopped
 #
-# Milestones: process exists, library DB file opened, WebKit content process
-# spawned. The last one is the closest observable proxy for "ready to show";
-# the app starts hidden, so window-shown time can only be timed by hand.
+# Milestones: process exists, library DB file opened. Everything after that
+# (webview ready, window shown) is not externally observable here: WKWebView's
+# WebContent process is an XPC service, not a child of the app, so `pgrep -f
+# com.apple.WebKit.WebContent` would only time *someone else's* webview. The app
+# also starts hidden, so "time until the window appears" needs a key press and
+# therefore a human.
 set -euo pipefail
 
 DEFAULT_APP="src-tauri/target/release/bundle/macos/Notes.app"
@@ -37,7 +40,7 @@ startup() {
     # "cold" = first launch of this build; "warm" = launch after the binary and
     # webview frameworks are already in the page cache. Neither drops caches:
     # that needs sudo, so treat the first number as an upper bound.
-    local start pid db_at web_at
+    local start pid db_at
     start=$(python3 -c 'import time; print(time.time())')
     open -a "$app"
     pid=""
@@ -58,16 +61,7 @@ startup() {
     local t_db
     t_db=$(python3 -c "import time; print(round(time.time()-$start, 3))")
 
-    web_at=""
-    for _ in $(seq 1 600); do
-      if pgrep -P "$pid" -f "com.apple.WebKit" >/dev/null 2>&1 ||
-         pgrep -f "com.apple.WebKit.WebContent" >/dev/null 2>&1; then web_at=1; break; fi
-      sleep 0.02
-    done
-    local t_web
-    t_web=$(python3 -c "import time; print(round(time.time()-$start, 3))")
-
-    echo "$run: pid=$pid process=${t_proc}s db_open=$([ -n "$db_at" ] && echo "${t_db}s" || echo n/a) webkit=$([ -n "$web_at" ] && echo "${t_web}s" || echo n/a)"
+    echo "$run: pid=$pid process=${t_proc}s db_open=$([ -n "$db_at" ] && echo "${t_db}s" || echo n/a)"
 
     # Quit gracefully so the warm run starts from the same state.
     kill -TERM "$pid" 2>/dev/null || true

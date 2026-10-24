@@ -133,7 +133,7 @@
 | 场景 | 状态 | 证据 |
 | --- | --- | --- |
 | 常驻资源占用 / 空闲驻留 | 待人工 | 8.4：10 分钟采样 0.00% CPU / 41.7 MB，**24h 未跑** |
-| 唤出与启动延迟 / 热唤出延迟 | 待人工 | 8.4：进程 0.24 s / 库 0.84 s / WebKit 1.11 s；「按快捷键到窗口出现」需人工 |
+| 唤出与启动延迟 / 热唤出延迟 | 待人工 | 8.4：进程 0.19 s / 库 0.74 s（`scripts/perf-check.sh startup`）；「按快捷键到窗口出现」需人工，脚本测不到 |
 | 数据安全演练 / 强制结束后恢复 | 自动 | `recovery.rs › hard_kill_recovery...`（真实 `process::exit`） |
 | 数据安全演练 / 备份还原 | 自动 | `recovery.rs › backup_restore_round_trip...` |
 | 打包与分发 / 本地构建可用 | 自动 | `pnpm tauri build` 与 `--target universal-apple-darwin` 均成功；x86_64 包已实际启动 |
