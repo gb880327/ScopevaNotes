@@ -17,7 +17,7 @@ const notes = useNotesStore()
 const settings = useSettingsStore()
 const ui = useUiStore()
 
-useTheme()
+const disposeTheme = useTheme()
 useKeyboard({ focusSearch: () => ui.focusSearch() })
 
 let unlisten: UnlistenFn[] = []
@@ -61,6 +61,7 @@ async function handleQuitRequest() {
 }
 
 onBeforeUnmount(() => {
+  disposeTheme()
   for (const stop of unlisten) stop()
 })
 </script>

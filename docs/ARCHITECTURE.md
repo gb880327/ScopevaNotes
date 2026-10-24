@@ -59,3 +59,7 @@ ANY --tray Quit--> exit(0)
 - 链接：`markdown.validateLink` 只放行 `http`/`https`/`mailto`/相对路径，
   预览内点击统一 `preventDefault()`，只有 http(s) 交给系统 opener。
 - 相关决策见 `openspec/changes/v1-notes-manager/design.md` D16。
+
+编辑器（`NoteEditor.vue`）的主题拆成两半：`editorTheme.ts` 的 `editorChrome` 只用
+CSS 令牌（行号、选区、搜索面板都随主题/强调色变），语法色则放进 `Compartment`，
+`settings.resolvedTheme` 变化时 `reconfigure`，不重建 `EditorView`（D17）。

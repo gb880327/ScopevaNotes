@@ -77,3 +77,12 @@
 4. **链接安全**：`markdown.validateLink` 改为协议白名单（`http`/`https`/`mailto`/相对路径），先剥离控制字符再判 scheme，因此 `java\tscript:` 这类变体同样被拒；协议相对 `//host` 一律拒绝。预览的点击处理器统一 `preventDefault()`，只有 http(s) 交给系统 opener，避免 webview 被导航走。
 
 权衡：切分让「代码块」不再是 markdown-it 的产物，两套解析规则必须保持对 CommonMark 围栏的一致（用 12 个单元测试锁定）；语法包按语言拆分意味着首次出现某语言时有几十到几百毫秒的加载与着色延迟，可接受，因为纯文本先行渲染。
+
+**D17 编辑器主题 = 主题无关的 chrome + 主题相关的语法色。** `basicSetup` 自带一套 `defaultHighlightStyle`，它是按浅底调的（`#070` 绿、`#219` 蓝），直接在深色下用会掉到 3:1 以下；但它同时是 fallback，只要我们的 style 覆盖了全部会被渲染的 tag 就不会露出来。
+
+1. **chrome 走 CSS 变量**（`editorChrome`）：行号、活动行、光标、选区、搜索面板、括号匹配、折叠占位都用 `--text` / `--text-muted` / `--accent-soft` 等令牌，所以换主题与换强调色都不需要重配扩展。
+2. **语法色走 `Compartment`**：`syntaxCompartment.of(editorSyntaxTheme(settings.resolvedTheme))`，主题变化时只 `reconfigure` 这一项，EditorView 不重建——笔记内容、滚动位置与光标都保留。
+3. **调色板单独一份**（`EDITOR_PALETTES`）：跟随 Shiki 的 `github-light-high-contrast` / `github-dark` 的语义色，但按编辑器真实底色重调。编辑区是透明的，实际底色是 `--bg`（白 / `#1c1c1e`），与 Shiki 的 `#24292e` 不同，直接套用会让深色注释色掉到 3.4:1。
+4. **对比度进测试**：`editorTheme.test.ts` 读 `src/styles/tokens.css` 取 `--bg`，先断言 `EDITOR_BACKGROUNDS` 与之同步（防止令牌改了而调色板未跟），再对每个语义色算 WCAG 比值要求 ≥ 4.5:1。这直接暴露了一个既有问题——行号用的 `--text-faint` 在白底只有 3.26:1，已改成 `--text-muted`。
+
+权衡：调色板在 TS 里维护意味着 Shiki 主题升级不会自动同步，靠「背景值来自 tokens.css」的断言兜住漂移；编辑器内的围栏代码块目前不着色（未装 lang 解析器），这一段由预览承担。

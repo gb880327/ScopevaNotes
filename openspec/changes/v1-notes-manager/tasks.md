@@ -77,7 +77,7 @@
 - [x] 7.2 主题（浅色/深色/跟随系统）、强调色、编辑器字号设置项。
 - [x] 7.3 偏好写 Tauri Store；浏览器开发环境退回 localStorage；损坏时回退默认值。
 - [ ] 7.4 跟随系统即时切换与对比度检查（正文/次要文字/代码块/选中态）。
-- [ ] 7.5 CodeMirror 与 Shiki 主题随外观设置联动。
+- [x] 7.5 CodeMirror 与 Shiki 主题随外观设置联动。`features/notes/editorTheme.ts` 把编辑器拆成「主题无关的 chrome」+「主题相关的语法色」：chrome（行号、选区、搜索框、括号、折叠占位）全部走设计令牌，语法色用 `Compartment` 在 `resolvedTheme` 变化时 `reconfigure`，不销毁重建 EditorView（内容与光标位置保留）。调色板对齐预览的 Shiki 主题但针对编辑器背景（`--bg` 而非 Shiki 自带底色）重调，`editorTheme.test.ts` 从 `tokens.css` 实测 `--bg` 并逐色断言 ≥ 4.5:1；实测浅色最差 5.04、深色 5.53，行号由 `--text-faint`（白底 3.3:1，不达标）改用 `--text-muted`（5.07 / 6.61）。`useTheme.test.ts` 验证强制浅/深、跟随系统、系统外观变化即时回调、设置变更即时生效、卸载后停止监听。
 
 ## 8. 质量与可验证性
 

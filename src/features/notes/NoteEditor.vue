@@ -2,29 +2,17 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { markdown } from '@codemirror/lang-markdown'
-import { EditorState } from '@codemirror/state'
+import { Compartment, EditorState } from '@codemirror/state'
+import { useSettingsStore } from '@/stores/settings'
+import { editorChrome, editorSyntaxTheme } from './editorTheme'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
+const settings = useSettingsStore()
 const host = ref<HTMLDivElement | null>(null)
+const syntaxCompartment = new Compartment()
 let view: EditorView | null = null
-
-const theme = EditorView.theme({
-  '&': {
-    fontSize: 'var(--editor-font-size)',
-    backgroundColor: 'transparent',
-    height: '100%',
-  },
-  '.cm-content': {
-    fontFamily: "'SF Mono', ui-monospace, Menlo, monospace",
-    padding: '8px 0 40px',
-    caretColor: 'var(--accent)',
-  },
-  '.cm-gutters': { backgroundColor: 'transparent', border: 'none' },
-  '&.cm-focused': { outline: 'none' },
-  '.cm-activeLine': { backgroundColor: 'var(--hover)' },
-})
 
 onMounted(() => {
   view = new EditorView({
@@ -35,7 +23,8 @@ onMounted(() => {
         basicSetup,
         markdown(),
         EditorView.lineWrapping,
-        theme,
+        editorChrome,
+        syntaxCompartment.of(editorSyntaxTheme(settings.resolvedTheme)),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) emit('update:modelValue', update.state.doc.toString())
         }),
@@ -43,6 +32,14 @@ onMounted(() => {
     }),
   })
 })
+
+// The chrome uses design tokens, so only the syntax colours need reconfiguring.
+watch(
+  () => settings.resolvedTheme,
+  (next) => {
+    view?.dispatch({ effects: syntaxCompartment.reconfigure(editorSyntaxTheme(next)) })
+  },
+)
 
 watch(
   () => props.modelValue,
