@@ -1,6 +1,6 @@
 ## Context
 
-仓库已有可运行的 Tauri 2 + Vue 3 + SQLite 骨架（提交 `f42ab93`、`1234a06`），产品范围与里程碑来自 `docs/macos-notes-manager-v1-implementation-plan.md`。本 change 将那份计划固化为规格，并决定实现期的技术取向。已落地的实现取舍见 `docs/DECISIONS.md`，架构分层见 `docs/ARCHITECTURE.md`；本文件不重复逐条细节，只记录会影响后续任务的设计决策。
+仓库已有可运行的 Tauri 2 + Vue 3 + SQLite 骨架（提交 `f42ab93`、`1234a06`），产品范围与里程碑已由本 change 固化为规格。架构分层与代码级约定见 `docs/ARCHITECTURE.md`；本文件记录会影响后续任务的技术决策，不重复逐条实现细节。
 
 约束：
 - 仅 macOS 12+，Intel 与 Apple Silicon 都要能构建；不联网、无账号、无服务端。
@@ -43,6 +43,12 @@
 **D10 备份用 `VACUUM INTO` 且不覆盖。** 得到一致性快照，不依赖 WAL 文件；目标存在即失败，避免误覆盖用户已有备份。
 
 **D11 前端只有 `services/commands.ts` 触碰 IPC。** 组件与 store 不直接 `invoke`，DTO 与错误在单一位置规范化，便于后续换传输或加日志。
+
+**D12 自定义路径失效时回退默认库并记录日志。** 直接启动失败会让用户连界面都看不到；但回退 MUST 在界面可见（`tasks.md` 5.6），不得静默把空库当成功。
+
+**D13 迁移笔记库保留旧文件。** 迁移 = 快照 → 打开新库 → 原子改配置指针；旧库不自动删除，失败时可回退，代价是需要用户手动清理。
+
+**D14 首次运行主动显示主窗口。** 配置文件默认 `visible: false`，但引导流程上线前在 `setup` 中显示，否则首次启动表现为「点了没反应」；6.13 完成后恢复默认隐藏。
 
 ## Risks / Trade-offs
 

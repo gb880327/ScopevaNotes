@@ -9,9 +9,7 @@ openspec status --change v1-notes-manager   # 产物与任务进度
 openspec validate v1-notes-manager --strict # 规格校验
 ```
 
-`docs/` 下的文档是设计参考与历史输入，不再作为规格来源：
-[`ARCHITECTURE`](docs/ARCHITECTURE.md)、[`DECISIONS`](docs/DECISIONS.md)、
-[`UI_SPEC`](docs/UI_SPEC.md)、[`TEST_PLAN`](docs/TEST_PLAN.md)、[`POC_FINDINGS`](docs/POC_FINDINGS.md)。
+`docs/ARCHITECTURE.md` 是设计参考（代码分层与约定），不作为规格来源。
 
 ## 开发
 
@@ -58,4 +56,4 @@ src-tauri/
 全局快捷键、关闭隐藏、窗口居中/置顶/尺寸记忆、笔记库打开/新建/迁移/备份。
 
 未完成：FTS 搜索（当前为 LIKE 子串）、Shiki 高亮、回收站视图、缩短快捷键自定义 UI、
-签名分发、macOS 实机交互验收。详见 `docs/POC_FINDINGS.md` 与 `docs/TEST_PLAN.md`。
+签名分发、macOS 实机交互验收。剩余工作见 `openspec/changes/v1-notes-manager/tasks.md` 未勾选项。

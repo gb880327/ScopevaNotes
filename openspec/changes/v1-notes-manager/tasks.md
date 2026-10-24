@@ -6,7 +6,7 @@
 - [x] 1.4 校验链路可跑通：`cargo check`、`cargo test`、`pnpm vue-tsc --noEmit`、`pnpm vitest run`、`pnpm vite build`。
 - [x] 1.5 运行时冒烟：`pnpm tauri dev` 无 panic 启动，默认路径生成 `notes.db` 并应用 v1/v2 迁移。
 - [x] 1.6 提交初始骨架（`f42ab93`、`1234a06`）并补齐 `README` / `docs`。
-- [x] 1.7 清理已迁移文档：`docs/*` 标注 OpenSpec 为唯一规格来源，计划文档降级为历史输入。
+- [x] 1.7 删除 docs 下已迁移的规划文档，只保留 `ARCHITECTURE.md` 作代码级参考。
 
 ## 2. 笔记数据层（notes-core）
 
@@ -85,7 +85,7 @@
 - [ ] 8.3 端到端冒烟：新建 → 编辑 → 自动保存 → 搜索 → 删除 → 恢复。
 - [ ] 8.4 24 小时驻留的资源与空闲 CPU 测量；冷/热启动耗时记录。
 - [ ] 8.5 断电/强杀恢复演练与备份还原往返。
-- [ ] 8.6 把 `docs/TEST_PLAN.md` 的未勾选项与规格场景逐条对齐，全部通过后才能勾选。
+- [ ] 8.6 把本清单中未勾选的验收项与本 change 的规格场景逐条对齐，全部通过后才能勾选。
 
 ## 9. 发布（release-readiness）
 
