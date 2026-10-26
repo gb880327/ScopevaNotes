@@ -19,9 +19,9 @@
 - [x] 2.3 面板显隐状态 + D5 护栏：`last_blur_hide_at`（250 ms 内忽略左键唤醒）、Esc 隐藏、失焦隐藏、显示后聚焦编辑区、记住尺寸不记坐标。验证：四种顺序（点托盘、点桌面、Esc、连点两次托盘）。**已做**：探针在真实进程里跑出 6 步事件顺序（含失焦隐藏、连点两次托盘收敛），记录在 `verification.md`；Esc 只有组件级证据，**250 ms 窗口内的时序仍待人工**。
 - [x] 2.4 定位：用 `TrayIconEvent::Click { rect }` 的物理矩形换算锚点，纯几何函数放 `platform/macos/monitor.rs`（或同级新纯函数模块），clamp 进该显示器可见区。验证：`cargo test --lib` 新增 3 条纯函数单测（正常屏、负坐标副屏、图标贴屏幕右缘时不越界）。
 - [x] 2.7 全屏 Space：把面板换成运行时声明的非激活 `NSPanel`（`ScopevaQuickTabsPanel`，重写 `canBecomeKeyWindow`）+ `canJoinAllSpaces | fullScreenAuxiliary`，见 design D16。探针在桌面环境确认换类后 `key=true focused=true level=25 behavior=0b100000001`；**同一显示器上的全屏应用已由用户本人验证通过（口头确认，无截图留档）**，全屏里点图标面板直接出现在其上并能打字、不切桌面。**副屏全屏仍待人工**（记为独立待验项）。
-- [ ] 2.8 全屏 Space 里贴顶而非挂菜单栏（design D18）：显示后轮询 `NSMenu.menuBarVisible`（300ms × 6），首次消失即把面板上移到屏幕顶边 +2px（水平不动）。验证：桌面态日志 `bar_visible=true -> (516,18)` 且无 snap、`cargo test --lib` 23 passed；**全屏态贴顶效果待用户真机确认**。
-- [ ] 2.5 托盘左键改目标，菜单项 `toggle` 的 label 改「显示主窗口」（ID 与行为不变）；右键菜单保持现状。验证：真机左键只切面板、右键只弹菜单、菜单项点到的是主窗口。
-- [ ] 2.6 `ui://library-changed`：切库命令成功后追加一次 `emit`（对现有命令是加一行）；面板收到后重新 `list_quick_tabs()` 并按 id 丢弃孤儿草稿。验证：真机切库后面板列出新库的速记，旧草稿不复活。
+- [x] 2.8 全屏 Space 里贴顶而非挂菜单栏（design D18）：`TRAY_GAP` 6→2（与菜单栏齐平）+ 显示后轮询 `NSMenu.menuBarVisible`（400ms × 25），首次消失即把面板上移到屏幕顶边 +2px（水平不动）。验证：桌面态实测 `bar_visible=true -> (516,14)` 且无 snap、`cargo test --lib` 23 passed；**用户本人真机确认全屏下已无间隙**（口头确认，无日志留档 —— 全屏那一次的 `menuBarVisible` 日志始终未采到，故只有结果证据）。
+- [x] 2.5 托盘左键改目标，菜单项 `toggle` 的 label 改「显示主窗口」（ID 与行为不变）；右键菜单保持现状。验证：真机左键只切面板、右键只弹菜单、菜单项点到的是主窗口。**已做**：用户本人在真机上逐条点过并确认（口头确认，无截图留档）。
+- [x] 2.6 `ui://library-changed`：切库命令成功后追加一次 `emit`（对现有命令是加一行）；面板收到后重新 `list_quick_tabs()` 并按 id 丢弃孤儿草稿。验证：真机切库后面板列出新库的速记，旧草稿不复活。**已做**：用户本人在真机上切库确认（口头确认，无截图留档）。
 
 ## 3. 前端：入口与数据
 
@@ -44,5 +44,5 @@
 - [x] 5.1 文档：`CHANGELOG.md` 增条目、`README.md` 功能清单补「速记」、`docs/RELEASE.md` 写用户视角（菜单栏左键呼出、上限 12、无出口、删除不可恢复、升级后勿用旧版本打开新库）。验证：三处存在且与 spec 表述一致。
 - [x] 5.2 `verification.md`：需求 → 证据矩阵（自动 / 人工已验 / 待人工），M0 的真机结论（含事件顺序实测）、面板入口 bundle 体积、空闲内存增量。验证：`openspec validate add-quick-tabs --strict` 通过，矩阵无空洞。
 - [x] 5.3 全量回归：`pnpm vue-tsc --noEmit`、`pnpm vitest run`、`pnpm vite build`、`cargo test --lib`、5 个集成测试文件（`--test-threads=1`）。验证：全部通过，且现有 169 个前端用例与全部 Rust 用例**断言零修改**（`git diff` 只显示新增用例）。
-- [ ] 5.4 隔离回归：确认主窗口行为零变化——⇧⌘D 切主窗口、重复启动唤主窗口、关闭主窗口隐藏、退出确认、单实例、居中定位。验证：真机逐条走一遍并记入 `verification.md`。
-- [ ] 5.5 归档时一并删除 `docs/scopeva-notes-quick-tabs-implementation-plan.md`（内容已全部吸收进 `design.md` 与 specs，留着会让 `docs/` 变第二基线）；`docs/` 只保留 `ARCHITECTURE.md`、`RELEASE.md`、logo 与图片。验证：`ls docs/` 不含该文件，`git status --porcelain` 干净。
+- [x] 5.4 隔离回归：确认主窗口行为零变化——⇧⌘D 切主窗口、重复启动唤主窗口、关闭主窗口隐藏、退出确认、单实例、居中定位。验证：真机逐条走一遍并记入 `verification.md`。**已做**：用户本人真机走完（口头确认，无截图留档）。
+- [x] 5.5 归档时一并删除 `docs/scopeva-notes-quick-tabs-implementation-plan.md`（内容已全部吸收进 `design.md` 与 specs，留着会让 `docs/` 变第二基线）；`docs/` 只保留 `ARCHITECTURE.md`、`RELEASE.md`、logo 与图片。验证：`ls docs/` 不含该文件，`git status --porcelain` 干净。
