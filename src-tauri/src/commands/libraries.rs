@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 use crate::commands::blocking;
 use crate::database::{backup, Database};
@@ -30,6 +30,9 @@ pub async fn create_library(
         },
     )?;
     state.replace_library(db, info.clone());
+    // Broadcast: the 速记 panel holds its own copy and must reload, otherwise
+    // it keeps writing drafts into the previous library (design D13).
+    let _ = app.emit("ui://library-changed", &info);
     Ok(info)
 }
 
@@ -51,6 +54,9 @@ pub async fn open_library(
         },
     )?;
     state.replace_library(db, info.clone());
+    // Broadcast: the 速记 panel holds its own copy and must reload, otherwise
+    // it keeps writing drafts into the previous library (design D13).
+    let _ = app.emit("ui://library-changed", &info);
     Ok(info)
 }
 
@@ -78,6 +84,9 @@ pub async fn move_library(
         },
     )?;
     state.replace_library(db, info.clone());
+    // Broadcast: the 速记 panel holds its own copy and must reload, otherwise
+    // it keeps writing drafts into the previous library (design D13).
+    let _ = app.emit("ui://library-changed", &info);
     Ok(info)
 }
 

@@ -18,6 +18,14 @@ export default defineConfig({
   envPrefix: ['VITE_', 'TAURI_ENV_'],
   build: {
     target: 'safari15',
+    rollupOptions: {
+      // Two windows, two entries. The panel keeps its own graph so it never
+      // drags in the editor/preview bundle (design D3/D14).
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        'quick-tabs': fileURLToPath(new URL('./quick-tabs.html', import.meta.url)),
+      },
+    },
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
   },
 })

@@ -9,6 +9,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (2, include_str!("../../migrations/0002_fts.sql")),
     (3, include_str!("../../migrations/0003_search_reindex.sql")),
     (4, include_str!("../../migrations/0004_import_source.sql")),
+    (5, include_str!("../../migrations/0005_quick_tabs.sql")),
 ];
 
 /// Migrations that change the shape of the search projection. After they run,

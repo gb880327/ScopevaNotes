@@ -1,6 +1,7 @@
 pub mod import;
 pub mod libraries;
 pub mod notes;
+pub mod quick_tabs;
 pub mod quit;
 pub mod shortcuts;
 pub mod tags;

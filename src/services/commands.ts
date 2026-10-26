@@ -10,6 +10,8 @@ import type {
   NoteDetail,
   NoteSummary,
   NoteSummaryPage,
+  QuickTab,
+  QuickTabLimits,
   Tag,
   TagWithCount,
 } from './types'
@@ -106,6 +108,23 @@ export const api = {
 
   /** Ask for the quit confirmation dialog; the app exits only if confirmed. */
   requestQuit: () => call<void>('request_quit'),
+
+  // 速记 (quick tabs). Mutations write only the `quick_tabs` table; nothing here
+  // can touch a note, which is what makes the sandbox claim true (design D1).
+  listQuickTabs: () => call<QuickTab[]>('list_quick_tabs'),
+  createQuickTab: (args: { title?: string; color?: string } = {}) =>
+    call<QuickTab>('create_quick_tab', args),
+  updateQuickTab: (args: {
+    id: string
+    title?: string
+    color?: string
+    content?: string
+  }) => call<QuickTab>('update_quick_tab', args),
+  deleteQuickTab: (id: string) => call<void>('delete_quick_tab', { id }),
+  duplicateQuickTab: (id: string) => call<QuickTab>('duplicate_quick_tab', { id }),
+  quickTabLimits: () => call<QuickTabLimits>('quick_tab_limits'),
+  /** Panel-only: hide unconditionally, used by Esc. */
+  hideQuickTabs: () => call<void>('hide_quick_tabs'),
 }
 
 export function errorMessage(err: unknown): string {

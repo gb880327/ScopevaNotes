@@ -19,8 +19,17 @@ const TRAY_ICON: &[u8] = include_bytes!("../../../icons/tray-logo.png");
 pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
     // No accelerator label here: the shortcut is user-configurable, and a
     // stale hint is worse than none. Settings shows the live value.
-    let toggle = MenuItem::with_id(app, "toggle", "显示 / 隐藏窗口", true, None::<&str>)?;
-    let new_note = MenuItem::with_id(app, "new_note", "新建笔记", true, Some("CommandOrControl+N"))?;
+    // Left click now owns the 速记 panel, so this item must say what it does:
+    // the main window (design D4). The id stays `toggle` for one reason only —
+    // its handler is unchanged.
+    let toggle = MenuItem::with_id(app, "toggle", "显示主窗口", true, None::<&str>)?;
+    let new_note = MenuItem::with_id(
+        app,
+        "new_note",
+        "新建笔记",
+        true,
+        Some("CommandOrControl+N"),
+    )?;
     let import = MenuItem::with_id(app, "import", "导入 Markdown…", true, None::<&str>)?;
     let library = MenuItem::with_id(app, "library", "笔记库…", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "设置…", true, Some("CommandOrControl+,"))?;
@@ -41,16 +50,8 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
     let menu = Menu::with_items(
         app,
         &[
-            &toggle,
-            &new_note,
-            &separator,
-            &autostart,
-            &separator,
-            &import,
-            &library,
-            &settings,
-            &separator,
-            &quit,
+            &toggle, &new_note, &separator, &autostart, &separator, &import, &library, &settings,
+            &separator, &quit,
         ],
     )?;
 
@@ -108,13 +109,21 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
+            // `rect` is the icon's own rect: it is the only way to hang the
+            // panel off the right spot on a multi-display setup (design D6).
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
+                rect,
                 ..
             } = event
             {
-                click_toggle(tray.app_handle());
+                let app = tray.app_handle();
+                if let Some(state) = app.try_state::<AppState>() {
+                    if let Err(err) = state.quick_tabs.toggle_from_tray(app, rect) {
+                        eprintln!("[tray] quick tabs toggle failed: {err}");
+                    }
+                }
             }
         })
         .build(app)?;
@@ -122,6 +131,8 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
     Ok(())
 }
 
+/// Menu items and the shortcut still target the main window; only the plain
+/// left click was re-pointed at the panel.
 fn click_toggle<R: Runtime>(app: &AppHandle<R>) {
     if let Some(state) = app.try_state::<AppState>() {
         if let Err(err) = state.window.toggle(app) {

@@ -2216,6 +2216,8 @@ name = "macos-notes"
 version = "0.1.0"
 dependencies = [
  "encoding_rs",
+ "objc2",
+ "objc2-app-kit",
  "rusqlite",
  "serde",
  "serde_json",

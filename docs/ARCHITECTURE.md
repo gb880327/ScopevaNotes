@@ -41,6 +41,21 @@ ANY --tray Quit--> exit(0)
 `show` 时：恢复上次逻辑尺寸 → clamp 到鼠标所在显示器 → 居中 → 置顶 → 聚焦。
 每次显示都重新居中，只持久化尺寸不持久化位置。
 
+### 速记面板（`quick-tabs` 窗口）
+
+多窗口从第二个页面入口开始：`quick-tabs.html` + `src/quick-tabs.ts`（`vite.config.ts`
+的 `build.rollupOptions.input`）只挂 `windows/quick-tabs/`，不 import 主窗口的任何
+feature、编辑器、`markdown-it` 或 Shiki。
+
+`platform/macos/quick_tabs_window.rs` 的 `QuickTabsWindow` 与 `WindowManager` 是
+两个类型：主窗口的显隐规则已稳定，泛化会把它带进风险。差异在于面板失焦即隐藏、
+位置贴托盘图标（`monitor::tray_anchor_origin`），而且**不**居中、**不**记坐标。
+托盘左键走 `toggle_from_tray`（带 250 ms 失焦护栏），菜单项与快捷键仍走主窗口。
+`on_window_event` 按 `label` 分支，两条分支互不影响。
+
+写路径是「内存草稿 + 300 ms 防抖写库 + `localStorage` 快照」，失败保留草稿；
+切库通过 `ui://library-changed` 通知面板重读，旧库草稿按孤儿丢弃。
+
 ## 自动保存
 
 `composables/useAutosave.ts` 提供串行化 + 防抖队列；`stores/notes.ts` 持有队列。

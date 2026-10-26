@@ -52,6 +52,33 @@ export interface NoteDetail {
   tags: Tag[]
 }
 
+/** Fixed colour keys for 速记 dots; the CSS mapping lives in `QuickDot.vue`. */
+export type QuickTabColor =
+  | 'yellow'
+  | 'orange'
+  | 'red'
+  | 'purple'
+  | 'blue'
+  | 'cyan'
+  | 'green'
+
+/** Mirrors `models/quick_tab.rs`. Isolated from notes by design (spec: 隔离). */
+export interface QuickTab {
+  id: string
+  title: string
+  color: string
+  content: string
+  sortOrder: number
+  createdAt: number
+  updatedAt: number
+}
+
+/** Mirrors `commands/quick_tabs.rs::QuickTabLimits`. */
+export interface QuickTabLimits {
+  maxTabs: number
+  colors: string[]
+}
+
 export type LibraryNoticeKind = 'fallback' | 'cloud-sync'
 
 /** Mirrors `library_service::LibraryNotice`. */

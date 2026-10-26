@@ -17,6 +17,10 @@
   --accent-contrast: #ffffff;
   --accent-soft: rgba(10, 132, 255, 0.12);
   --danger: #cc0013;
+  /* 1px outline for 速记 dots. The seven dot fills are identity colours, not
+     text: several of them (yellow, cyan, green) are far too light to reach
+     3:1 on their own, so the outline carries the non-text contrast. */
+  --dot-ring: rgba(0, 0, 0, 0.45);
   --code-bg: #f6f6f8;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06);
   --editor-font-size: 14px;
@@ -41,6 +45,7 @@
   --accent-contrast: #0d0d0f;
   --accent-soft: rgba(10, 132, 255, 0.22);
   --danger: #ff7a72;
+  --dot-ring: rgba(255, 255, 255, 0.45);
   --code-bg: #26262a;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.4);
 }

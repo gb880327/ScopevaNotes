@@ -10,9 +10,9 @@ notes-core、release-readiness、search）。归档副本保留决策与验收�
 - [`openspec/changes/archive/2026-10-24-add-markdown-import/`](openspec/changes/archive/2026-10-24-add-markdown-import/)：批量导入 Markdown（24/26，design D1–D14、`verification.md`）
 - [`openspec/changes/archive/2026-10-24-add-tag-management/`](openspec/changes/archive/2026-10-24-add-tag-management/)：标签管理（19/19，design D1–D8、`verification.md`）
 - [`openspec/changes/archive/2026-10-24-add-trash-purge/`](openspec/changes/archive/2026-10-24-add-trash-purge/)：回收站出口（17/17，design D1–D6、`verification.md`）
+- `openspec/changes/add-quick-tabs/`：速记面板（实现中，design D1–D15、`tasks.md`、`verification.md`）
 
-目前没有规划中的未实现变更：上述四个 change 都已归档，新需求从
-`openspec new change <name>` 重新开始。
+新需求从 `openspec new change <name>` 重新开始。
 
 ```bash
 openspec validate --all --strict               # 基线规格 + 全部 change
@@ -104,6 +104,13 @@ src-tauri/
 永久删除在同一事务里同时移除正文、标签关联与搜索索引，库里的记录彻底消失；
 文件不会因此变小（SQLite 只把页放入 freelist，不做 VACUUM）。
 
+速记面板是第二条入口：菜单栏图标左键呼出一个小窗口（480×320，无标题栏、置顶、
+跟随所有 Space），一条速记 = 一个彩色圆点 + 一段纯文本，最多 12 个。
+正文 300 ms 防抖写库并同步写 `localStorage` 快照，写库失败保留草稿、成功才删快照，
+崩溃或重启后快照比库里新就自动恢复；失焦自动隐藏（带 250 ms 护栏，避免「点托盘图标
+被当成两次操作」），切 Tab / Esc / 失焦 / 退出请求都会先 flush 再隐藏。
+速记是只进不出的沙盒：不转成笔记、不导出、删除永久不可恢复；切库后旧草稿按孤儿丢弃。
+
 批量导入 Markdown（从 Obsidian 等应用一次性迁移）：三阶段模态（选择目录 → 进度 →
 报告）、只读扫描与 dry-run 统计、隐藏目录跳过并计数、UTF-8/GB18030 解码（GB 回退逐条标注）、
 frontmatter 子集解析（title/tags/created）、保留文件 mtime 顺序、正文逐字保真（不解析
@@ -118,6 +125,10 @@ mtime 保留/正文逐字保真）。
 导入的已知限制：不迁移附件（图片链接原样保留但文件不复制）、不解析 Obsidian 扩展语法、
 不做同步或目录监听、同一天两次导入共用 `import-YYYY-MM-DD` 这一撤销粒度。详见
 `openspec/changes/archive/2026-10-24-add-markdown-import/design.md`（D1–D14）。
+
+速记的已知限制：全文只有纯文本（不做 Markdown 预览）、没有置顶/排序、没有导出或
+「转成笔记」的出口、删除不可撤销、上限 12 是硬编码（改上限需要迁移与重新算宽度）。
+详见 `openspec/changes/add-quick-tabs/design.md`（D1–D15）。
 
 v1 的交付范围：**本机自用**。tasks.md 已全部勾选（70/70），其中 macOS 实机交互验收
 （快捷键连按、多显示器、Spaces、菜单栏观感）、端到端 UI 冒烟、24 小时驻留采样时长与

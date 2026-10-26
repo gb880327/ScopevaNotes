@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { QUICK_TAB_COLORS, QUICK_TAB_COLOR_KEYS } from '@/windows/quick-tabs/quickTabColors'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -115,6 +116,8 @@ function surfaces(vars: Vars): Record<string, [number, number, number]> {
 }
 
 const TEXT_TOKENS = ['text', 'text-muted', 'text-faint', 'accent-text', 'danger']
+/** WCAG 1.4.11: graphical objects need 3:1, not 4.5:1. */
+const MIN_GRAPHIC_RATIO = 3
 const MIN_RATIO = 4.5
 
 describe('design token contrast', () => {
@@ -150,6 +153,29 @@ describe('design token contrast', () => {
           `--accent-contrast on --accent-text (${theme}, ${accent})`,
         ).toBeGreaterThanOrEqual(MIN_RATIO)
       }
+    })
+  }
+
+  // 速记 dots: the fill is identity, the outline is contrast. Yellow/cyan/green
+  // are far too light to carry 3:1 by themselves on a light panel.
+  for (const theme of THEMES) {
+    it(`keeps every 速记 dot distinguishable (${theme})`, () => {
+      const vars = resolveTokens(theme, 'blue')
+      const panel = parseColor(vars['bg-sidebar']).rgb
+      const ring = composite(vars['dot-ring'], panel)
+      expect(QUICK_TAB_COLOR_KEYS, 'the spec requires seven colour keys').toHaveLength(7)
+
+      const failures: string[] = []
+      for (const [key, spec] of Object.entries(QUICK_TAB_COLORS)) {
+        const best = Math.max(
+          ratio(spec.dot, panel),
+          ratio(`rgb(${ring.join(',')})`, panel),
+        )
+        if (best < MIN_GRAPHIC_RATIO) {
+          failures.push(`${key}: ${best.toFixed(2)}:1 (< ${MIN_GRAPHIC_RATIO})`)
+        }
+      }
+      expect(failures).toEqual([])
     })
   }
 

@@ -17,6 +17,9 @@ pub struct AppState {
     import_running: Arc<AtomicBool>,
     import_cancel: Arc<AtomicBool>,
     pub window: crate::platform::macos::window_manager::WindowManager,
+    /// The 速记 panel. Kept beside the main window manager rather than inside
+    /// it: the two have unrelated visibility rules (design D2).
+    pub quick_tabs: crate::platform::macos::quick_tabs_window::QuickTabsWindow,
 }
 
 impl AppState {
@@ -30,6 +33,7 @@ impl AppState {
             import_running: Arc::new(AtomicBool::new(false)),
             import_cancel: Arc::new(AtomicBool::new(false)),
             window: Default::default(),
+            quick_tabs: Default::default(),
         }
     }
 

@@ -61,6 +61,12 @@ pub fn run() {
                 shortcuts::DEFAULT_SHORTCUT.to_string(),
             ));
 
+            // Created hidden so the first tray click shows a warm webview
+            // instead of a cold start. A failure here must not abort launch.
+            if let Err(err) = platform::macos::quick_tabs_window::QuickTabsWindow::create(&handle) {
+                eprintln!("[quick-tabs] window creation failed: {err}");
+            }
+
             tray::setup(&handle)?;
             if let Err(err) = shortcuts::register(&handle, shortcuts::DEFAULT_SHORTCUT) {
                 // A taken shortcut must not abort startup.
@@ -73,15 +79,37 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                // Close button hides; only the tray "Quit" exits (plan §1.3).
-                api.prevent_close();
-                let app = window.app_handle();
-                if let Some(state) = app.try_state::<AppState>() {
-                    if let Err(err) = state.window.hide(app) {
+            let label = window.label();
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    // Neither window is ever destroyed: the app lives in the
+                    // menu bar, and the panel must stay warm.
+                    api.prevent_close();
+                    let app = window.app_handle();
+                    let Some(state) = app.try_state::<AppState>() else {
+                        return;
+                    };
+                    if label == platform::macos::quick_tabs_window::QuickTabsWindow::LABEL {
+                        if let Err(err) = state.quick_tabs.hide(app) {
+                            eprintln!("[quick-tabs] hide failed: {err}");
+                        }
+                    } else if let Err(err) = state.window.hide(app) {
+                        // Close button hides; only the tray "Quit" exits (plan §1.3).
                         eprintln!("[window] hide failed: {err}");
                     }
                 }
+                // Clicking anywhere outside the panel dismisses it (design D5).
+                WindowEvent::Focused(false)
+                    if label == platform::macos::quick_tabs_window::QuickTabsWindow::LABEL =>
+                {
+                    let app = window.app_handle();
+                    if let Some(state) = app.try_state::<AppState>() {
+                        if let Err(err) = state.quick_tabs.hide_on_blur(app) {
+                            eprintln!("[quick-tabs] blur hide failed: {err}");
+                        }
+                    }
+                }
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -111,7 +139,14 @@ pub fn run() {
             commands::libraries::move_library,
             commands::libraries::backup_library,
             commands::libraries::dismiss_library_notice,
+            commands::quick_tabs::list_quick_tabs,
+            commands::quick_tabs::create_quick_tab,
+            commands::quick_tabs::update_quick_tab,
+            commands::quick_tabs::delete_quick_tab,
+            commands::quick_tabs::duplicate_quick_tab,
+            commands::quick_tabs::quick_tab_limits,
             commands::window::toggle_main_window,
+            commands::window::hide_quick_tabs,
             commands::shortcuts::get_global_shortcut,
             commands::shortcuts::set_global_shortcut,
             commands::quit::request_quit,
