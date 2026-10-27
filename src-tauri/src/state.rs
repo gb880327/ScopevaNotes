@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use crate::database::Database;
-use crate::services::library_service::LibraryInfo;
+use crate::services::library_service::{ConfigCache, LibraryInfo, SizeSlot};
 
 pub struct AppState {
     db: RwLock<Arc<Database>>,
@@ -20,10 +20,28 @@ pub struct AppState {
     /// The 速记 panel. Kept beside the main window manager rather than inside
     /// it: the two have unrelated visibility rules (design D2).
     pub quick_tabs: crate::platform::macos::quick_tabs_window::QuickTabsWindow,
+    /// The only writer of `config.json`; the window managers and the library
+    /// commands all go through it so neither drops the other's fields.
+    pub config: Arc<ConfigCache>,
 }
 
 impl AppState {
-    pub fn new(db: Database, library: LibraryInfo, shortcut: String) -> Self {
+    pub fn new(
+        db: Database,
+        library: LibraryInfo,
+        shortcut: String,
+        config: Arc<ConfigCache>,
+    ) -> Self {
+        // Both windows start from the sizes remembered on disk, so the first
+        // show after a restart already has the user's dimensions.
+        let window = crate::platform::macos::window_manager::WindowManager::new(
+            Arc::clone(&config),
+            config.size(SizeSlot::Main),
+        );
+        let quick_tabs = crate::platform::macos::quick_tabs_window::QuickTabsWindow::new(
+            Arc::clone(&config),
+            config.size(SizeSlot::QuickTabs),
+        );
         Self {
             db: RwLock::new(Arc::new(db)),
             library: Mutex::new(library),
@@ -32,8 +50,9 @@ impl AppState {
             quit_pending: AtomicBool::new(false),
             import_running: Arc::new(AtomicBool::new(false)),
             import_cancel: Arc::new(AtomicBool::new(false)),
-            window: Default::default(),
-            quick_tabs: Default::default(),
+            window,
+            quick_tabs,
+            config,
         }
     }
 
@@ -80,9 +99,7 @@ impl AppState {
 
     /// One dialog at a time, even if the shortcut and the tray fire together.
     pub fn begin_quit_prompt(&self) -> bool {
-        !self
-            .quit_pending
-            .swap(true, Ordering::SeqCst)
+        !self.quit_pending.swap(true, Ordering::SeqCst)
     }
 
     pub fn end_quit_prompt(&self) {

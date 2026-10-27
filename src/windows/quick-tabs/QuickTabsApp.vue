@@ -52,7 +52,15 @@ async function select(id: string) {
 
 async function focusEditor() {
   await nextTick()
-  editor.value?.focus()
+  const area = editor.value
+  if (!area) return
+  area.focus()
+  // `focus()` on a textarea that already has content puts the caret at the end
+  // (and scrolls there), which showed the last line every time the panel
+  // opened. The panel always opens at the top of the note (spec: 速记面板打开
+  // 时的插入点).
+  area.setSelectionRange(0, 0)
+  area.scrollTop = 0
 }
 
 async function add() {

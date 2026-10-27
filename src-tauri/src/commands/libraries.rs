@@ -5,7 +5,7 @@ use tauri::{AppHandle, Emitter, State};
 use crate::commands::blocking;
 use crate::database::{backup, Database};
 use crate::models::AppResult;
-use crate::services::library_service::{self, AppConfig, LibraryInfo, NoticeKind};
+use crate::services::library_service::{self, LibraryInfo, NoticeKind};
 use crate::state::AppState;
 
 #[tauri::command]
@@ -23,12 +23,11 @@ pub async fn create_library(
     library_service::validate_new_path(&target)?;
     let db = blocking(move || Database::open(&target)).await?;
     let info = library_service::info_for(&db, false)?;
-    library_service::save_config(
-        &app,
-        &AppConfig {
-            library_path: Some(info.path.clone()),
-        },
-    )?;
+    // Through the cache: the same file holds the remembered window sizes, and a
+    // bare `AppConfig { library_path }` write would drop them (design D5).
+    state
+        .config
+        .set_library_path(&app, Some(info.path.clone()))?;
     state.replace_library(db, info.clone());
     // Broadcast: the 速记 panel holds its own copy and must reload, otherwise
     // it keeps writing drafts into the previous library (design D13).
@@ -47,12 +46,11 @@ pub async fn open_library(
     blocking(move || library_service::validate_existing_path(&checked)).await?;
     let db = blocking(move || Database::open(&target)).await?;
     let info = library_service::info_for(&db, false)?;
-    library_service::save_config(
-        &app,
-        &AppConfig {
-            library_path: Some(info.path.clone()),
-        },
-    )?;
+    // Through the cache: the same file holds the remembered window sizes, and a
+    // bare `AppConfig { library_path }` write would drop them (design D5).
+    state
+        .config
+        .set_library_path(&app, Some(info.path.clone()))?;
     state.replace_library(db, info.clone());
     // Broadcast: the 速记 panel holds its own copy and must reload, otherwise
     // it keeps writing drafts into the previous library (design D13).
@@ -77,12 +75,11 @@ pub async fn move_library(
 
     let db = blocking(move || Database::open(&target)).await?;
     let info = library_service::info_for(&db, false)?;
-    library_service::save_config(
-        &app,
-        &AppConfig {
-            library_path: Some(info.path.clone()),
-        },
-    )?;
+    // Through the cache: the same file holds the remembered window sizes, and a
+    // bare `AppConfig { library_path }` write would drop them (design D5).
+    state
+        .config
+        .set_library_path(&app, Some(info.path.clone()))?;
     state.replace_library(db, info.clone());
     // Broadcast: the 速记 panel holds its own copy and must reload, otherwise
     // it keeps writing drafts into the previous library (design D13).
@@ -111,12 +108,7 @@ pub async fn dismiss_library_notice(
         Some(NoticeKind::Fallback)
     );
     if use_default && is_fallback {
-        library_service::save_config(
-            &app,
-            &AppConfig {
-                library_path: None,
-            },
-        )?;
+        state.config.set_library_path(&app, None)?;
     }
     Ok(state.clear_notice())
 }

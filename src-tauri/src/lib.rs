@@ -59,6 +59,7 @@ pub fn run() {
                 db,
                 info,
                 shortcuts::DEFAULT_SHORTCUT.to_string(),
+                std::sync::Arc::new(library_service::ConfigCache::load(&handle)),
             ));
 
             // Created hidden so the first tray click shows a warm webview

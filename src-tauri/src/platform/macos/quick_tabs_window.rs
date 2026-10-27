@@ -1,7 +1,7 @@
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
-        Mutex,
+        Arc, Mutex,
     },
     time::{Duration, Instant},
 };
@@ -16,6 +16,7 @@ use objc2_app_kit::NSPanel;
 
 use crate::models::{AppError, AppResult};
 use crate::platform::macos::monitor;
+use crate::services::library_service::{ConfigCache, SizeSlot};
 
 /// Gap between the menu bar icon and the panel, in logical pixels.
 const TRAY_GAP: f64 = 2.0;
@@ -191,15 +192,29 @@ pub struct QuickTabsWindow {
     /// When the panel last hid itself, so the tray click that caused it is not
     /// treated as a new open request (design D5).
     last_blur_hide: Mutex<Option<Instant>>,
-    /// Panel size is remembered across shows; the position never is (design D6).
+    /// Panel size is remembered across shows and across restarts; the position
+    /// never is (design D6).
     saved_size: Mutex<Option<(f64, f64)>>,
     /// Physical rect of the tray button, kept for programmatic shows.
     tray_rect: Mutex<Option<(f64, f64, f64, f64)>>,
+    /// Present once the app is wired up; without it the panel still works and
+    /// just forgets its size on exit.
+    config: Option<Arc<ConfigCache>>,
 }
 
 impl QuickTabsWindow {
     pub const LABEL: &'static str = "quick-tabs";
     pub const URL: &'static str = "quick-tabs.html";
+
+    /// Seeded with the size remembered in `config.json` (spec: 调整面板尺寸后
+    /// 重启仍是上次的尺寸).
+    pub fn new(config: Arc<ConfigCache>, size: Option<(f64, f64)>) -> Self {
+        Self {
+            config: Some(config),
+            saved_size: Mutex::new(size),
+            ..Default::default()
+        }
+    }
 
     /// Created hidden at startup so the first click is warm. Failure is not
     /// fatal: the rest of the app works, and `toggle` reports the error.
@@ -239,7 +254,7 @@ impl QuickTabsWindow {
         *self.last_blur_hide.lock().expect("blur lock poisoned") = None;
         let window = self.window(app)?;
         if window.is_visible().unwrap_or(false) {
-            self.hide_window(&window)?;
+            self.hide_window(&window, app)?;
             Ok(false)
         } else {
             self.show_window(&window, app, icon)?;
@@ -266,7 +281,7 @@ impl QuickTabsWindow {
     pub fn hide<R: Runtime>(&self, app: &AppHandle<R>) -> AppResult<()> {
         let _gate = self.gate.lock().expect("quick tabs gate poisoned");
         let window = self.window(app)?;
-        self.hide_window(&window)
+        self.hide_window(&window, app)
     }
 
     /// Lost focus (clicked another app, another window, or the menu bar).
@@ -276,7 +291,7 @@ impl QuickTabsWindow {
         if !window.is_visible().unwrap_or(false) {
             return Ok(());
         }
-        self.hide_window(&window)?;
+        self.hide_window(&window, app)?;
         *self.last_blur_hide.lock().expect("blur lock poisoned") = Some(Instant::now());
         Ok(())
     }
@@ -296,11 +311,7 @@ impl QuickTabsWindow {
         // been shown yet reports a size that is off by its scale factor, and
         // anchoring with a half-width panel puts it under the wrong part of the
         // menu bar (caught by the runtime probe, not by the unit tests).
-        let panel = self
-            .saved_size
-            .lock()
-            .expect("size lock poisoned")
-            .unwrap_or(DEFAULT_SIZE);
+        let panel = *self.saved_size.lock().expect("size lock poisoned");
         let top_logical = self.place_under_tray(window, app, icon, panel)?;
         window.show()?;
         window.set_focus()?;
@@ -311,7 +322,11 @@ impl QuickTabsWindow {
         Ok(())
     }
 
-    fn hide_window<R: Runtime>(&self, window: &WebviewWindow<R>) -> AppResult<()> {
+    fn hide_window<R: Runtime>(
+        &self,
+        window: &WebviewWindow<R>,
+        app: &AppHandle<R>,
+    ) -> AppResult<()> {
         // Only a window that was actually on screen has a trustworthy size.
         if window.is_visible().unwrap_or(false) {
             if let Ok(size) = window.inner_size() {
@@ -321,8 +336,14 @@ impl QuickTabsWindow {
                     .flatten()
                     .map(|monitor| monitor.scale_factor())
                     .unwrap_or(1.0);
-                *self.saved_size.lock().expect("size lock poisoned") =
-                    Some((size.width as f64 / scale, size.height as f64 / scale));
+                let logical = (size.width as f64 / scale, size.height as f64 / scale);
+                *self.saved_size.lock().expect("size lock poisoned") = Some(logical);
+                // A failed write must not stop the panel from hiding.
+                if let Some(config) = &self.config {
+                    if let Err(err) = config.set_size(app, SizeSlot::QuickTabs, logical) {
+                        eprintln!("[quick-tabs] size not persisted: {err}");
+                    }
+                }
             }
         }
         window.hide()?;
@@ -338,7 +359,7 @@ impl QuickTabsWindow {
         window: &WebviewWindow<R>,
         app: &AppHandle<R>,
         icon: Option<Rect>,
-        panel: (f64, f64),
+        panel: Option<(f64, f64)>,
     ) -> AppResult<Option<f64>> {
         if let Some(rect) = icon {
             *self.tray_rect.lock().expect("tray rect lock poisoned") = Some(physical_rect(rect));
@@ -375,7 +396,7 @@ impl QuickTabsWindow {
             size.height as f64 / scale,
         );
 
-        let (width, height) = monitor::clamp_to_area(area, panel);
+        let (width, height) = monitor::clamp_window_size(panel, DEFAULT_SIZE, MIN_SIZE, area);
         window.set_size(LogicalSize::new(width, height))?;
 
         let logical_icon = icon

@@ -84,6 +84,27 @@ describe('速记 panel', () => {
     wrapper.unmount()
   })
 
+  it('puts the caret at the very beginning when the panel opens another tab', async () => {
+    const body = 'x'.repeat(2000)
+    const wrapper = await mountPanel([
+      tab('a', { title: '甲', content: `第一行\n${body}` }),
+      tab('b', { title: '乙', color: 'blue', content: `第一行\n${body}` }),
+    ])
+
+    const area = wrapper.get('[data-testid="quick-tab-editor"]').element as HTMLTextAreaElement
+    // What the browser does to a focused textarea that already has content:
+    // the caret goes to the end, i.e. the last line is what the user sees.
+    area.setSelectionRange(area.value.length, area.value.length)
+    expect(area.selectionStart).toBe(area.value.length)
+
+    await wrapper.get('[data-testid="quick-tab-dot-b"]').trigger('click')
+    await flushPromises()
+
+    expect(area.selectionStart).toBe(0)
+    expect(area.selectionEnd).toBe(0)
+    wrapper.unmount()
+  })
+
   it('selects with a ring and a colour-independent accessible name', async () => {
     const wrapper = await mountPanel([tab('a', { title: '甲', color: 'yellow' })])
 

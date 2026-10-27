@@ -11,10 +11,26 @@ pub fn centered_origin(area: (f64, f64, f64, f64), window: (f64, f64)) -> (f64, 
     )
 }
 
-/// Keep a window fully inside the monitor it is being placed on.
-pub fn clamp_to_area(area: (f64, f64, f64, f64), window: (f64, f64)) -> (f64, f64) {
-    let (_, _, aw, ah) = area;
-    (window.0.min(aw).max(1.0), window.1.min(ah).max(1.0))
+/// Turn a remembered window size into one the current display can show.
+///
+/// `config.json` is a file the user can edit, so a stored value is untrusted
+/// input: smaller than the window's minimum gets lifted to the minimum, larger
+/// than the display gets pulled back onto it, and a missing value falls back to
+/// `default` through the same rules (design D4).
+pub fn clamp_window_size(
+    saved: Option<(f64, f64)>,
+    default: (f64, f64),
+    min: (f64, f64),
+    area: (f64, f64, f64, f64),
+) -> (f64, f64) {
+    let (aw, ah) = (area.2.max(1.0), area.3.max(1.0));
+    let (sw, sh) = saved.unwrap_or(default);
+    // `min` first so a stored 1x1 becomes usable, then the display so it never
+    // spills off-screen; the outer `min` wins when the display itself is
+    // smaller than the minimum (better a cramped window than an invisible one).
+    let width = sw.max(min.0.min(aw)).min(aw);
+    let height = sh.max(min.1.min(ah)).min(ah);
+    (width, height)
 }
 
 /// Anchor a menu-bar panel under its icon. `area` is the monitor, `icon` the
@@ -115,10 +131,64 @@ mod tests {
     }
 
     #[test]
-    fn oversized_window_is_clamped_to_display() {
+    fn remembered_size_survives_a_normal_display() {
         assert_eq!(
-            clamp_to_area((0.0, 0.0, 900.0, 600.0), (1200.0, 900.0)),
-            (900.0, 600.0)
+            clamp_window_size(
+                Some((1320.0, 860.0)),
+                (1100.0, 720.0),
+                (760.0, 480.0),
+                (0.0, 0.0, 2560.0, 1440.0)
+            ),
+            (1320.0, 860.0)
+        );
+    }
+
+    #[test]
+    fn remembered_size_is_lifted_to_the_minimum() {
+        assert_eq!(
+            clamp_window_size(
+                Some((200.0, 120.0)),
+                (480.0, 320.0),
+                (360.0, 220.0),
+                (0.0, 0.0, 1680.0, 1050.0)
+            ),
+            (360.0, 220.0)
+        );
+    }
+
+    #[test]
+    fn remembered_size_is_pulled_onto_a_smaller_display() {
+        assert_eq!(
+            clamp_window_size(
+                Some((2000.0, 1400.0)),
+                (1100.0, 720.0),
+                (760.0, 480.0),
+                (0.0, 0.0, 1440.0, 900.0)
+            ),
+            (1440.0, 900.0)
+        );
+    }
+
+    #[test]
+    fn missing_size_falls_back_to_the_default_unless_the_display_is_smaller() {
+        assert_eq!(
+            clamp_window_size(
+                None,
+                (480.0, 320.0),
+                (360.0, 220.0),
+                (0.0, 0.0, 1680.0, 1050.0)
+            ),
+            (480.0, 320.0)
+        );
+        assert_eq!(
+            clamp_window_size(
+                None,
+                (480.0, 320.0),
+                (360.0, 220.0),
+                (0.0, 0.0, 400.0, 300.0)
+            ),
+            (400.0, 300.0),
+            "a display smaller than the default wins over the default"
         );
     }
 }
