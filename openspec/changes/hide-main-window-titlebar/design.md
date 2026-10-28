@@ -49,6 +49,20 @@ Tauri v2 的拖拽区由注入脚本处理：`mousedown` 命中带 `data-tauri-d
 
 没有选 `NSWindow.setMovableByWindowBackground(true)`：它让整个窗口背景可拖，会和正文里的文本选择、编辑器拖选抢事件。
 
+### D5 必须开 `acceptFirstMouse`，否则窗口未激活时第一次拖不动
+
+开发机实测（合成 `leftMouseDown/Dragged/Up` 事件 + `CGWindowListCopyWindowInfo` 读窗口原点）：
+
+| 状态 | `acceptFirstMouse` | 结果 |
+| --- | --- | --- |
+| 主窗口已激活 | 默认 `false` | 拖动成功（原点精确位移 +60 / +40） |
+| 另一应用在前台（访达激活） | 默认 `false` | **不动**，且前台应用不变 |
+| 另一应用在前台 | `true` | 拖动成功（+60 / +40），并顺手把本应用激活 |
+
+原因：wry 的 `WryWebView` 用 `acceptsFirstMouse:` 返回该配置（默认 `false`），窗口未激活时第一次 mouse-down 只用于激活应用、不投递给 webview，于是 `data-tauri-drag-region` 的注入脚本根本没收到事件。这恰好是本需求的主场景——主窗口通常是「别的东西在前台时用快捷键唤起」，所以默认值不可接受。
+
+选 `acceptFirstMouse: true` 而不是在 show 路径里补 `set_focus()`：`set_focus()` 在速记那一轮已被删除（它会把 App 抢到前台，配合全屏面板语义会打架），而 `acceptFirstMouse` 只影响「点击是否穿透到 webview」，不动激活时序。副作用是未激活窗口上的第一下点击会直接生效（点列表就选中、点正文就落光标），这与 macOS 常见应用一致。
+
 ### D4 对话框仍覆盖整窗
 
 `SettingsDialog` / `ImportDialog` 是 `position: fixed; inset: 0`，相对视口定位，与 DOM 层级无关，所以它们照旧盖住包括拖拽条在内的整个窗口，不需要跟着挪进 `.body`。

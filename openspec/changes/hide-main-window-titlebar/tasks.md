@@ -5,6 +5,8 @@
 
 ## 2. 顶部拖拽条
 
+- [x] 2.0 `src-tauri/tauri.conf.json` 增加 `"acceptFirstMouse": true`（窗口未激活时第一次 mouse-down 只激活应用、不投递给 webview，拖拽区收不到事件；实测见 `design.md` D5 与 `verification.md` §2b）
+
 - [x] 2.1 `src/windows/MainWindow.vue`：`.shell` 改为纵向布局，最上插入 `.titlebar`（`flex: 0 0 auto; height: 32px`），原来的三栏移进 `.body`（`display: flex; flex: 1; min-height: 0`）
 - [x] 2.2 `.titlebar` 左段宽度绑定 `settings.sidebarWidth`、底色 `--bg-sidebar`、右缘 `1px solid var(--border)`；右段 `flex: 1`、底色 `--bg`
 - [x] 2.3 两段都加 `data-tauri-drag-region`
@@ -18,8 +20,8 @@
 
 ## 4. 真机确认（人做，未做即未通过）
 
-> 本轮只做到“开发机截图 + 自动化回归”，下面三项未经用户实机验证，保持未勾选。
+> 4.1 / 4.3 已由用户本人在真机确认；4.2 的“拖动”已由开发机合成事件证明（见 `verification.md` §2b），但用户首次真机拖动失败、补 `acceptFirstMouse` 后尚未复验，故 4.2 保持未勾选。
 
-- [ ] 4.1 唤出主窗口：顶部没有标题文字与标题栏底色，界面从窗口上沿开始
-- [ ] 4.2 拖顶部空条能移动窗口；双击空条能缩放
-- [ ] 4.3 红绿灯仍在且行为不变（红=隐藏、黄=最小化、绿=全屏）
+- [x] 4.1 唤出主窗口：顶部没有标题文字与标题栏底色，界面从窗口上沿开始 —— 用户本人真机确认（2026-10-28），无截图/录屏留档
+- [ ] 4.2 拖顶部空条能移动窗口；双击空条能缩放（开发机合成事件已通过，用户首次真机尝试失败后已补 `acceptFirstMouse`，待复验）
+- [x] 4.3 红绿灯仍在且行为不变（红=隐藏、黄=最小化、绿=全屏） —— 用户本人真机确认（2026-10-28），无截图/录屏留档

@@ -22,6 +22,7 @@
         "visible": false,
         "center": true,
         "alwaysOnTop": false,
+        "acceptFirstMouse": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true
       }
