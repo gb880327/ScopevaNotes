@@ -8,7 +8,9 @@
 
 配置不可用（文件缺失、内容损坏、写入失败）时 MUST 回退到默认尺寸（1100×720）并继续工作，MUST NOT 阻断启动、显示或隐藏。速记面板的定位与尺寸规则由 `quick-tabs` capability 定义，MUST NOT 套用本条的中心定位规则。
 
-当其他应用正处于全屏（独立 Space）时唤出主窗口，主窗口 MUST 显示在该全屏应用之上，MUST NOT 留在用户原来的桌面或别的 Space。为此主窗口 MUST 加入所有桌面并声明为全屏辅助窗口（`NSWindowCollectionBehavior::CanJoinAllSpaces | FullScreenAuxiliary`）。该能力 MUST NOT 让主窗口退化为不接收键盘输入的浮层：它 MUST 保持普通可激活窗口的行为，原生标题栏、红绿灯、关闭即隐藏（⌘W）与退出确认（⌘Q）语义 MUST 不变。
+当其他应用正处于全屏（独立 Space）时唤出主窗口，主窗口 MUST 显示在该全屏应用之上，MUST NOT 留在用户原来的桌面或别的 Space，MUST NOT 让用户被动退出全屏。为此主窗口 MUST 是一个全屏辅助面板：窗口类 MUST 为 `NSPanel` 的子类，样式 MUST 含 `NSWindowStyleMaskNonactivatingPanel`，`collectionBehavior` MUST 含 `CanJoinAllSpaces | FullScreenAuxiliary`。仅给普通 `NSWindow` 设置 `collectionBehavior` MUST NOT 被视为满足本条。
+
+该能力 MUST NOT 让主窗口退化为不接收键盘输入的浮层：窗口 MUST 能成为 key，且在成为 key 时 MUST 让本应用成为活动应用（菜单栏归属本应用），原生标题栏、红绿灯、关闭即隐藏（⌘W）与退出确认（⌘Q）语义 MUST 不变。
 
 #### Scenario: 鼠标在副屏
 - **WHEN** 鼠标位于副显示器且用户唤出主窗口
@@ -36,7 +38,11 @@
 
 #### Scenario: 全屏应用之上显示主窗口
 - **WHEN** 用户把某个应用切到全屏，然后在菜单栏选择「显示主窗口」
-- **THEN** 主窗口显示在该全屏应用之上并可直接输入，用户不必先退出全屏或切 Space
+- **THEN** 主窗口显示在该全屏应用之上并可直接输入，那个应用的全屏状态保持不变，用户不必先退出全屏或切 Space
+
+#### Scenario: 焦点跟随菜单栏
+- **WHEN** 其他应用在前台，用户点击角落里仍可见的主窗口
+- **THEN** 主窗口获得键盘焦点，菜单栏切换为本应用的菜单
 
 ### Requirement: 菜单栏常驻
 

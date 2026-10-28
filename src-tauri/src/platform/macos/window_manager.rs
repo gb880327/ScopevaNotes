@@ -3,6 +3,9 @@ use std::sync::{
     Arc, Mutex,
 };
 
+use objc2::ClassType;
+use objc2_app_kit::NSPanel;
+
 use tauri::{AppHandle, LogicalSize, Manager, PhysicalPosition, Runtime, WebviewWindow};
 
 use crate::models::{AppError, AppResult};
@@ -156,35 +159,88 @@ impl WindowManager {
     }
 }
 
-/// Lets the main window appear on top of another app's full-screen Space
-/// (spec: 全屏应用之上显示主窗口).
+objc2::define_class!(
+    /// `NSPanel` subclass for the main window.
+    ///
+    /// A plain `NSWindow` is never drawn inside another app's full-screen Space,
+    /// however high its level: AppKit keeps it on the Space where it may become
+    /// key, so showing it there silently moves the user back to that desktop
+    /// instead (measured on device — see verification.md). The menu-bar-panel
+    /// recipe works:
+    ///
+    /// * class swap to `NSPanel`, which AppKit treats as auxiliary;
+    /// * `NSWindowStyleMaskNonactivatingPanel`, so the panel may take keyboard
+    ///   input while joining that Space instead of dragging the app out of it;
+    /// * `canJoinAllSpaces | fullScreenAuxiliary`, so it is allowed in.
+    ///
+    /// The activating behaviour a document window needs is restored in
+    /// `becomeKeyWindow`: without it a click focuses the window but leaves the
+    /// menu bar on the other app.
+    #[unsafe(super(NSPanel))]
+    #[name = "ScopevaMainWindowPanel"]
+    #[ivars = ()]
+    struct MainWindowPanel;
+
+    impl MainWindowPanel {
+        #[unsafe(method(canBecomeKeyWindow))]
+        fn can_become_key_window(&self) -> bool {
+            true
+        }
+
+        #[unsafe(method(canBecomeMainWindow))]
+        fn can_become_main_window(&self) -> bool {
+            true
+        }
+
+        #[unsafe(method(becomeKeyWindow))]
+        fn become_key_window(&self) {
+            // SAFETY: AppKit calls this on the main thread; `super(self)` only
+            // forwards to NSPanel's own implementation.
+            unsafe {
+                let _: () = objc2::msg_send![super(self), becomeKeyWindow];
+            }
+            if let Some(mtm) = objc2::MainThreadMarker::new() {
+                // `activate` is macOS 14+; the bundle targets 12.0.
+                #[allow(deprecated)]
+                objc2_app_kit::NSApplication::sharedApplication(mtm)
+                    .activateIgnoringOtherApps(true);
+            }
+        }
+    }
+);
+
+/// Turns the main window into a panel that may be shown inside another app's
+/// full-screen Space (spec: 全屏应用之上显示主窗口).
 ///
-/// The level set by `set_always_on_top` is irrelevant on its own: a window that
-/// is not a member of the full-screen Space is simply not drawn there, no matter
-/// how high it floats. `CanJoinAllSpaces` puts it on every desktop and
-/// `FullScreenAuxiliary` lets it be an auxiliary window over some other app's
-/// full-screen window (design D1).
-///
-/// Must be called on the main thread; ignores the failure of the underlying
-/// window handle, because a window that cannot join is still usable, it just
-/// stays on its own desktop.
-pub fn join_fullscreen_spaces<R: Runtime>(window: &WebviewWindow<R>) -> AppResult<()> {
-    use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
+/// Must be called on the main thread once, right after the window exists: the
+/// class, style mask and collection behaviour are properties of the window
+/// object, and Tauri's `show` / `hide` / `set_always_on_top` never touch them
+/// (design D2).
+pub fn prepare_main_window<R: Runtime>(window: &WebviewWindow<R>) -> AppResult<()> {
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::{NSWindowCollectionBehavior, NSWindowStyleMask};
 
     let handle = window
         .ns_window()
         .map_err(|err| AppError::Other(format!("no NSWindow handle: {err}")))?;
 
     // SAFETY: `ns_window()` hands us tao's live window object and we are on the
-    // main thread, which is the only thread AppKit allows here. We only read and
-    // write `collectionBehavior` — a plain property on that object — and never
-    // change its class or its level.
+    // main thread, the only thread AppKit allows. `object_setClass` is sound
+    // here because `NSPanel` adds no instance variables (456 vs 464 bytes of
+    // storage) and `MainWindowPanel` declares none; after the swap the object is
+    // only used through `NSPanel` / `NSWindow` messages.
     unsafe {
-        let ns_window = &*(handle as *const NSWindow);
-        let behavior = ns_window.collectionBehavior()
-            | NSWindowCollectionBehavior::CanJoinAllSpaces
-            | NSWindowCollectionBehavior::FullScreenAuxiliary;
-        ns_window.setCollectionBehavior(behavior);
+        objc2::ffi::object_setClass(handle as *mut AnyObject, MainWindowPanel::class());
+
+        let panel = &*(handle as *const NSPanel);
+        panel.setStyleMask(panel.styleMask() | NSWindowStyleMask::NonactivatingPanel);
+        panel.setHidesOnDeactivate(false);
+        panel.setBecomesKeyOnlyIfNeeded(false);
+        panel.setCollectionBehavior(
+            panel.collectionBehavior()
+                | NSWindowCollectionBehavior::CanJoinAllSpaces
+                | NSWindowCollectionBehavior::FullScreenAuxiliary,
+        );
     }
     Ok(())
 }

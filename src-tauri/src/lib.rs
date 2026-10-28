@@ -69,13 +69,14 @@ pub fn run() {
             }
 
             // The main window must be able to show up over another app's
-            // full-screen Space (spec: 全屏应用之上显示主窗口). Set once here:
-            // the property lives on the NSWindow and nothing in the show/hide
-            // path touches it. Failing only costs that ability, so no abort.
+            // full-screen Space (spec: 全屏应用之上显示主窗口). The window class,
+            // style mask and collection behaviour are set once here; nothing in
+            // the show/hide path touches them (design D2). Failing only costs
+            // that ability, so no abort.
             if let Some(window) = app.get_webview_window(
                 platform::macos::window_manager::WindowManager::LABEL,
             ) {
-                if let Err(err) = platform::macos::window_manager::join_fullscreen_spaces(&window) {
+                if let Err(err) = platform::macos::window_manager::prepare_main_window(&window) {
                     eprintln!("[window] full-screen space unavailable: {err}");
                 }
             }
