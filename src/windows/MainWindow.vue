@@ -33,7 +33,6 @@ onMounted(async () => {
     unlisten = await Promise.all([
       listen('ui://new-note', () => void notes.createNote()),
       listen('ui://open-settings', () => ui.openSettings()),
-      listen('ui://open-library', () => ui.openSettings()),
       listen('ui://import-markdown', () => ui.openImport()),
       listen('ui://quit-requested', () => void handleQuitRequest()),
     ])

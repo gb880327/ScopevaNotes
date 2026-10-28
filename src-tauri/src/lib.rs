@@ -68,6 +68,18 @@ pub fn run() {
                 eprintln!("[quick-tabs] window creation failed: {err}");
             }
 
+            // The main window must be able to show up over another app's
+            // full-screen Space (spec: 全屏应用之上显示主窗口). Set once here:
+            // the property lives on the NSWindow and nothing in the show/hide
+            // path touches it. Failing only costs that ability, so no abort.
+            if let Some(window) = app.get_webview_window(
+                platform::macos::window_manager::WindowManager::LABEL,
+            ) {
+                if let Err(err) = platform::macos::window_manager::join_fullscreen_spaces(&window) {
+                    eprintln!("[window] full-screen space unavailable: {err}");
+                }
+            }
+
             tray::setup(&handle)?;
             if let Err(err) = shortcuts::register(&handle, shortcuts::DEFAULT_SHORTCUT) {
                 // A taken shortcut must not abort startup.

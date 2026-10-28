@@ -155,3 +155,36 @@ impl WindowManager {
         Ok(())
     }
 }
+
+/// Lets the main window appear on top of another app's full-screen Space
+/// (spec: 全屏应用之上显示主窗口).
+///
+/// The level set by `set_always_on_top` is irrelevant on its own: a window that
+/// is not a member of the full-screen Space is simply not drawn there, no matter
+/// how high it floats. `CanJoinAllSpaces` puts it on every desktop and
+/// `FullScreenAuxiliary` lets it be an auxiliary window over some other app's
+/// full-screen window (design D1).
+///
+/// Must be called on the main thread; ignores the failure of the underlying
+/// window handle, because a window that cannot join is still usable, it just
+/// stays on its own desktop.
+pub fn join_fullscreen_spaces<R: Runtime>(window: &WebviewWindow<R>) -> AppResult<()> {
+    use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
+
+    let handle = window
+        .ns_window()
+        .map_err(|err| AppError::Other(format!("no NSWindow handle: {err}")))?;
+
+    // SAFETY: `ns_window()` hands us tao's live window object and we are on the
+    // main thread, which is the only thread AppKit allows here. We only read and
+    // write `collectionBehavior` — a plain property on that object — and never
+    // change its class or its level.
+    unsafe {
+        let ns_window = &*(handle as *const NSWindow);
+        let behavior = ns_window.collectionBehavior()
+            | NSWindowCollectionBehavior::CanJoinAllSpaces
+            | NSWindowCollectionBehavior::FullScreenAuxiliary;
+        ns_window.setCollectionBehavior(behavior);
+    }
+    Ok(())
+}

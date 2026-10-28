@@ -31,7 +31,6 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
         Some("CommandOrControl+N"),
     )?;
     let import = MenuItem::with_id(app, "import", "导入 Markdown…", true, None::<&str>)?;
-    let library = MenuItem::with_id(app, "library", "笔记库…", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "设置…", true, Some("CommandOrControl+,"))?;
     let quit = MenuItem::with_id(app, "quit", "退出 Notes", true, Some("CommandOrControl+Q"))?;
     let separator = PredefinedMenuItem::separator(app)?;
@@ -50,8 +49,8 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
     let menu = Menu::with_items(
         app,
         &[
-            &toggle, &new_note, &separator, &autostart, &separator, &import, &library, &settings,
-            &separator, &quit,
+            &toggle, &new_note, &separator, &autostart, &separator, &import, &settings, &separator,
+            &quit,
         ],
     )?;
 
@@ -78,10 +77,6 @@ pub fn setup<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
                     }
                 }
                 let _ = app.emit("ui://import-markdown", ());
-            }
-            "library" => {
-                let _ = app.emit("ui://open-library", ());
-                click_toggle(app);
             }
             "settings" => {
                 let _ = app.emit("ui://open-settings", ());
