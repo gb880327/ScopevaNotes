@@ -69,9 +69,22 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="shell">
-    <Sidebar :style="{ width: `${settings.sidebarWidth}px` }" />
-    <SidebarSplitter />
-    <ContentPane />
+    <!-- 无标题栏窗口的拖拽区：左段与侧栏同宽同色，右段与正文同色（design D2） -->
+    <div class="titlebar">
+      <span
+        class="titlebar-side"
+        :style="{ width: `${settings.sidebarWidth}px` }"
+        data-tauri-drag-region
+      />
+      <span class="titlebar-main" data-tauri-drag-region />
+    </div>
+
+    <div class="body">
+      <Sidebar :style="{ width: `${settings.sidebarWidth}px` }" />
+      <SidebarSplitter />
+      <ContentPane />
+    </div>
+
     <SettingsDialog />
     <ImportDialog />
   </div>
@@ -80,7 +93,36 @@ onBeforeUnmount(() => {
 <style scoped>
 .shell {
   display: flex;
+  flex-direction: column;
   height: 100%;
+  min-height: 0;
+}
+
+/* The window has no title bar (`titleBarStyle: Overlay` + `hiddenTitle`), so
+   this strip is what the user drags. It also keeps the traffic lights clear of
+   the sidebar header. */
+.titlebar {
+  display: flex;
+  flex: 0 0 auto;
+  height: 32px;
+}
+
+.titlebar-side {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+}
+
+.titlebar-main {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+}
+
+.body {
+  display: flex;
+  flex: 1;
   min-height: 0;
 }
 </style>
